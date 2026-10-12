@@ -23,7 +23,7 @@ local CONFIG = {
     bgColor       = Color3.fromRGB(20, 22, 30),
     textColor     = Color3.fromRGB(240, 240, 250),
     openKey       = Enum.KeyCode.F1,
-    menuSize      = UDim2.fromOffset(460, 580),
+    menuSize = UDim2.fromOffset(640, 660),
     buttonHeight  = 46,
     buttonSpacing = 8,
 }
@@ -193,7 +193,7 @@ tabBarGradient.Parent = tabBar
 
 -- Индикатор-подсветка активной вкладки (двигается плавно)
 local tabIndicator = Instance.new("Frame")
-tabIndicator.Size = UDim2.new(1/5, -4, 1, -6)
+tabIndicator.Size = UDim2.new(1/8, -4, 1, -6)
 tabIndicator.Position = UDim2.new(0, 3, 0, 3)
 tabIndicator.BackgroundColor3 = CONFIG.accentColor
 tabIndicator.BorderSizePixel = 0
@@ -224,18 +224,23 @@ local function makeTabButton(text, xOffset)
     return b
 end
 
-local tab1Button = makeTabButton("Locations", 0)
-local tab2Button = makeTabButton("My", 0)
-local tab3Button = makeTabButton("Farm", 0)
-local tab4Button = makeTabButton("Utilities", 0)
-local tab5Button = makeTabButton("PvP", 0)
+local tab1Button = makeTabButton("📍 Лок", 0)
+local tab2Button = makeTabButton("⭐ Точки", 0)
+local tab3Button = makeTabButton("⚙️ Фарм", 0)
+local tab4Button = makeTabButton("🎮 Утил", 0)
+local tab5Button = makeTabButton("⚔️ PvP", 0)
+local tab6Button = makeTabButton("🤖 Авто", 0)
+local tab7Button = makeTabButton("📦 Инв", 0)
+local tab8Button = makeTabButton("📊 Статы", 0)
 
-local TAB_W = 1/5
-tab1Button.Size = UDim2.new(TAB_W, 0, 1, 0); tab1Button.Position = UDim2.new(TAB_W * 0, 0, 0, 0)
-tab2Button.Size = UDim2.new(TAB_W, 0, 1, 0); tab2Button.Position = UDim2.new(TAB_W * 1, 0, 0, 0)
-tab3Button.Size = UDim2.new(TAB_W, 0, 1, 0); tab3Button.Position = UDim2.new(TAB_W * 2, 0, 0, 0)
-tab4Button.Size = UDim2.new(TAB_W, 0, 1, 0); tab4Button.Position = UDim2.new(TAB_W * 3, 0, 0, 0)
-tab5Button.Size = UDim2.new(TAB_W, 0, 1, 0); tab5Button.Position = UDim2.new(TAB_W * 4, 0, 0, 0)
+local TAB_W = 1/8
+local tabButtonsAll = {tab1Button, tab2Button, tab3Button, tab4Button,
+                       tab5Button, tab6Button, tab7Button, tab8Button}
+for i, b in ipairs(tabButtonsAll) do
+    b.Size = UDim2.new(TAB_W, 0, 1, 0)
+    b.Position = UDim2.new(TAB_W * (i-1), 0, 0, 0)
+    b.TextSize = 12
+end
 
 ---------------------------------------------------------------
 -- КОНТЕЙНЕР КОНТЕНТА (под вкладками)
@@ -274,42 +279,25 @@ local function makeScrollingList(parent)
     return scroll, layout
 end
 
-local tab1Frame = Instance.new("Frame")
-tab1Frame.Size = UDim2.fromScale(1, 1)
-tab1Frame.BackgroundTransparency = 1
-tab1Frame.Visible = true
-tab1Frame.Parent = contentHolder
+local tabFrames = {}
+local scrolls = {}
+for i = 1, 8 do
+    local f = Instance.new("Frame")
+    f.Size = UDim2.fromScale(1, 1)
+    f.BackgroundTransparency = 1
+    f.Visible = (i == 1)
+    f.Parent = contentHolder
+    tabFrames[i] = f
+    scrolls[i] = makeScrollingList(f)
+end
 
-local tab2Frame = Instance.new("Frame")
-tab2Frame.Size = UDim2.fromScale(1, 1)
-tab2Frame.BackgroundTransparency = 1
-tab2Frame.Visible = false
-tab2Frame.Parent = contentHolder
+local tab1Frame, tab2Frame, tab3Frame = tabFrames[1], tabFrames[2], tabFrames[3]
+local tab4Frame, tab5Frame, tab6Frame = tabFrames[4], tabFrames[5], tabFrames[6]
+local tab7Frame, tab8Frame = tabFrames[7], tabFrames[8]
 
-local tab3Frame = Instance.new("Frame")
-tab3Frame.Size = UDim2.fromScale(1, 1)
-tab3Frame.BackgroundTransparency = 1
-tab3Frame.Visible = false
-tab3Frame.Parent = contentHolder
-
-local tab4Frame = Instance.new("Frame")
-tab4Frame.Size = UDim2.fromScale(1, 1)
-tab4Frame.BackgroundTransparency = 1
-tab4Frame.Visible = false
-tab4Frame.Parent = contentHolder
-
-local tab5Frame = Instance.new("Frame")
-tab5Frame.Size = UDim2.fromScale(1, 1)
-tab5Frame.BackgroundTransparency = 1
-tab5Frame.Visible = false
-tab5Frame.Parent = contentHolder
-
-local scroll1, _ = makeScrollingList(tab1Frame)
-local scroll2, _ = makeScrollingList(tab2Frame)
-local scroll3, _ = makeScrollingList(tab3Frame)
-local scroll4, _ = makeScrollingList(tab4Frame)
-local scroll5, _ = makeScrollingList(tab5Frame)
-
+local scroll1, scroll2, scroll3 = scrolls[1], scrolls[2], scrolls[3]
+local scroll4, scroll5, scroll6 = scrolls[4], scrolls[5], scrolls[6]
+local scroll7, scroll8 = scrolls[7], scrolls[8]
 ---------------------------------------------------------------
 -- ПАНЕЛЬ ДЕЙСТВИЙ ДЛЯ ВКЛАДКИ 2 (добавить/выбрать/очистить)
 ---------------------------------------------------------------
@@ -532,7 +520,7 @@ local function switchTab(tabNum)
     if tabNum == currentTab then return end
     currentTab = tabNum
 
-    local targetX = UDim2.new((tabNum - 1) / 5, tabNum == 1 and 3 or 1, 0, 3)
+    local targetX = UDim2.new((tabNum - 1) / 8, tabNum == 1 and 3 or 1, 0, 3)
 
     TweenService:Create(tabIndicator, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Position = targetX,
@@ -541,34 +529,27 @@ local function switchTab(tabNum)
     local activeColor = Color3.new(1, 1, 1)
     local inactiveColor = Color3.fromRGB(160, 165, 190)
 
-    for _, pair in ipairs({
-        {tab1Button, 1}, {tab2Button, 2}, {tab3Button, 3},
-        {tab4Button, 4}, {tab5Button, 5}
-    }) do
-        TweenService:Create(pair[1], TweenInfo.new(0.2), {
-            TextColor3 = (tabNum == pair[2]) and activeColor or inactiveColor,
+    for i, b in ipairs(tabButtonsAll) do
+        TweenService:Create(b, TweenInfo.new(0.2), {
+            TextColor3 = (tabNum == i) and activeColor or inactiveColor,
         }):Play()
     end
 
-    tab1Frame.Visible = (tabNum == 1)
-    tab2Frame.Visible = (tabNum == 2)
-    tab3Frame.Visible = (tabNum == 3)
-    tab4Frame.Visible = (tabNum == 4)
-    tab5Frame.Visible = (tabNum == 5)
+    for i, f in ipairs(tabFrames) do
+        f.Visible = (i == tabNum)
+    end
     actionBar.Visible = (tabNum == 2)
 
-    local activeFrame = ({tab1Frame, tab2Frame, tab3Frame, tab4Frame, tab5Frame})[tabNum]
+    local activeFrame = tabFrames[tabNum]
     activeFrame.Position = UDim2.new(0, (tabNum == 1) and -10 or 10, 0, 0)
     TweenService:Create(activeFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Position = UDim2.new(0, 0, 0, 0),
     }):Play()
 end
 
-tab1Button.MouseButton1Click:Connect(function() switchTab(1) end)
-tab2Button.MouseButton1Click:Connect(function() switchTab(2) end)
-tab3Button.MouseButton1Click:Connect(function() switchTab(3) end)
-tab4Button.MouseButton1Click:Connect(function() switchTab(4) end)
-tab5Button.MouseButton1Click:Connect(function() switchTab(5) end)
+for i, b in ipairs(tabButtonsAll) do
+    b.MouseButton1Click:Connect(function() switchTab(i) end)
+end
 
 tab1Button.TextColor3 = Color3.new(1, 1, 1)
 
@@ -1898,7 +1879,37 @@ local function punchTarget(target)
     end)
 end
 
-makeSectionHeader(scroll5, "⚔️ АТАКА")
+makeSectionHeader(scroll5, "🎯 ТОЧЕЧНАЯ АТАКА")
+
+local targetKillName = ""
+local targetKillRunning = false
+
+local targetBox = makeInputRow(scroll5, "Ник цели", "", nil)
+targetBox.PlaceholderText = "Ник игрока + Enter"
+targetBox.FocusLost:Connect(function(enter)
+    if enter then
+        targetKillName = targetBox.Text:gsub("%s+", "")
+    end
+end)
+
+makeToggleRow(scroll5, "Auto Kill Target", false, function(on)
+    targetKillRunning = on
+    if on then
+        task.spawn(function()
+            while targetKillRunning do
+                if #targetKillName > 0 then
+                    local target = Players:FindFirstChild(targetKillName)
+                    if target and target ~= player and isAlive(target) and not isProtected(target) then
+                        punchTarget(target)
+                    end
+                end
+                task.wait(0.05)
+            end
+        end)
+    end
+end)
+
+makeSectionHeader(scroll5, "⚔️ МАССОВАЯ АТАКА")
 
 local killAuraRunning = false
 local killAuraRange = 20
@@ -1952,11 +1963,7 @@ end)
 
 makeSectionHeader(scroll5, "🛡️ WHITELIST")
 
-local whitelistInput = makeInputRow(scroll5, "Добавить в whitelist", "", function(v)
-    if v and type(v) == "number" then return end
-end)
-
--- Используем textbox напрямую — имя игрока, не число
+local whitelistInput = makeInputRow(scroll5, "Добавить ник", "", nil)
 whitelistInput.PlaceholderText = "Ник игрока + Enter"
 whitelistInput.FocusLost:Connect(function(enter)
     if enter then
@@ -2004,135 +2011,569 @@ task.spawn(function()
     end
 end)
 
-makeSectionHeader(scroll5, "📊 СТАТЫ ИГРОКА")
+--==============================================================
+--  🤖 ВКЛАДКА «АВТО»
+--==============================================================
+local VIM = game:GetService("VirtualInputManager")
 
-local statsLabel = makeInfoLabel(scroll5, "Выбери игрока выше", Color3.fromRGB(150, 155, 180))
-local statsLabel2 = makeInfoLabel(scroll5, "", Color3.fromRGB(150, 155, 180))
-local statsLabel3 = makeInfoLabel(scroll5, "", Color3.fromRGB(150, 155, 180))
+makeSectionHeader(scroll6, "👑 АВТО-BOSS")
 
-local spectatePlayer = nil
+-- Auto Boss (упрощённая версия — телепорт к цели и удары)
+local autoBossRunning = false
+makeToggleRow(scroll6, "Auto Boss (ближайший)", false, function(on)
+    autoBossRunning = on
+    if on then
+        task.spawn(function()
+            while autoBossRunning do
+                pcall(function()
+                    local char = player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if not hrp then return end
 
-local function pickPlayer(name)
-    for _, other in ipairs(Players:GetPlayers()) do
-        if other.Name == name or other.DisplayName == name then
-            spectatePlayer = other
-            return
-        end
+                    local closest, closestDist = nil, math.huge
+                    for _, d in ipairs(Workspace:GetDescendants()) do
+                        if d:IsA("Model") and string.find(d.Name:lower(), "boss", 1, true) then
+                            local head = d:FindFirstChild("HumanoidRootPart") or d:FindFirstChild("Head")
+                            if head then
+                                local dist = (head.Position - hrp.Position).Magnitude
+                                if dist < closestDist then
+                                    closest, closestDist = head, dist
+                                end
+                            end
+                        end
+                    end
+
+                    if closest then
+                        hrp.CFrame = CFrame.new(closest.Position + Vector3.new(0, 3, 3), closest.Position)
+                        for _ = 1, 10 do
+                            if not autoBossRunning then break end
+                            player.muscleEvent:FireServer("punch", "leftHand")
+                            player.muscleEvent:FireServer("punch", "rightHand")
+                            task.wait(0.05)
+                        end
+                    end
+                end)
+                task.wait(0.1)
+            end
+        end)
     end
-    spectatePlayer = nil
+end)
+
+makeSectionHeader(scroll6, "🪨 АВТО-КАМНИ")
+
+local rockData = {
+    ["Tiny Rock"] = 0,
+    ["Punching Rock"] = 10,
+    ["Large Rock"] = 100,
+    ["Golden Rock"] = 5000,
+    ["Frost Rock"] = 150000,
+    ["Mythical Rock"] = 400000,
+    ["Eternal Rock"] = 750000,
+    ["Legend Rock"] = 1000000,
+    ["Muscle King Rock"] = 5000000,
+    ["Jungle Rock"] = 10000000,
+    ["Industrial Rock"] = 25000000,
+}
+
+local selectedRock = nil
+local autoRockRunning = false
+
+for name in pairs(rockData) do
+    makeActionRow(scroll6, "🪨 " .. name, Color3.fromRGB(45, 55, 80), function()
+        selectedRock = name
+    end)
 end
 
--- Кнопки для быстрого выбора игрока
-local playerButtonsHolder = Instance.new("Frame")
-playerButtonsHolder.Size = UDim2.new(1, 0, 0, 0)
-playerButtonsHolder.AutomaticSize = Enum.AutomaticSize.Y
-playerButtonsHolder.BackgroundTransparency = 1
-playerButtonsHolder.Parent = scroll5
+makeToggleRow(scroll6, "Auto Rock (выбранный выше)", false, function(on)
+    autoRockRunning = on
+    if on then
+        task.spawn(function()
+            while autoRockRunning do
+                task.wait(0.12)
+                if selectedRock and player.Character then
+                    local dura = player:FindFirstChild("Durability")
+                    if dura and dura.Value >= rockData[selectedRock] then
+                        for _, v in pairs(Workspace.machinesFolder:GetDescendants()) do
+                            if v.Name == "neededDurability" and v.Value == rockData[selectedRock] then
+                                local char = player.Character
+                                local rh = char:FindFirstChild("RightHand")
+                                local lh = char:FindFirstChild("LeftHand")
+                                local rock = v.Parent:FindFirstChild("Rock")
+                                if rock and rh and lh then
+                                    firetouchinterest(rock, rh, 0)
+                                    firetouchinterest(rock, rh, 1)
+                                    firetouchinterest(rock, lh, 0)
+                                    firetouchinterest(rock, lh, 1)
+                                    player.muscleEvent:FireServer("punch", "leftHand")
+                                    player.muscleEvent:FireServer("punch", "rightHand")
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
 
-local pListLayout = Instance.new("UIListLayout")
-pListLayout.Padding = UDim.new(0, 4)
-pListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-pListLayout.Parent = playerButtonsHolder
+makeSectionHeader(scroll6, "🏋️ АВТО-ТРЕНАЖЁРЫ")
 
-local function rebuildPlayerList()
-    for _, c in ipairs(playerButtonsHolder:GetChildren()) do
+-- Auto Squat / Lift
+local machinesFolder = Workspace:WaitForChild("machinesFolder", 10)
+local machineData = {
+    Squat = { selected = nil, running = false, active = nil },
+    Lift = { selected = nil, running = false, active = nil },
+}
+
+local squatNames, liftNames = {}, {}
+if machinesFolder then
+    for _, m in ipairs(machinesFolder:GetChildren()) do
+        local lname = m.Name:lower()
+        if string.find(lname, "squat") and lname ~= "squat rack" then
+            table.insert(squatNames, m.Name)
+        elseif string.find(lname, "lift") and lname ~= "deadlift" then
+            table.insert(liftNames, m.Name)
+        end
+    end
+end
+
+local function getInteractSeat(machine)
+    for _, d in ipairs(machine:GetDescendants()) do
+        if d:IsA("BasePart") and d.Name:lower() == "interactseat" then
+            return d
+        end
+    end
+end
+
+local function enterMachine(machine)
+    if not machine or not machine.Parent then return false end
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local seat = getInteractSeat(machine)
+    if not hrp or not seat then return false end
+
+    hrp.CFrame = seat.CFrame * CFrame.new(0, 3, 0)
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    task.wait(0.4)
+    VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.1)
+    VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    task.wait(0.4)
+    return true
+end
+
+local function runMachine(data)
+    data.running = true
+    task.spawn(function()
+        while data.running do
+            if data.selected and not data.active then
+                if enterMachine(data.selected) then
+                    data.active = data.selected
+                end
+            end
+            if data.active then
+                pcall(function() player.muscleEvent:FireServer("rep") end)
+            end
+            task.wait()
+        end
+        data.active = nil
+    end)
+end
+
+-- Squat
+for _, name in ipairs(squatNames) do
+    makeActionRow(scroll6, "🦵 " .. name, Color3.fromRGB(45, 55, 80), function()
+        if machinesFolder then
+            machineData.Squat.selected = machinesFolder:FindFirstChild(name)
+        end
+    end)
+end
+makeToggleRow(scroll6, "Auto Squat", false, function(on)
+    machineData.Squat.running = on
+    if on then
+        machineData.Squat.active = nil
+        runMachine(machineData.Squat)
+    end
+end)
+
+-- Lift
+for _, name in ipairs(liftNames) do
+    makeActionRow(scroll6, "🏋️ " .. name, Color3.fromRGB(45, 55, 80), function()
+        if machinesFolder then
+            machineData.Lift.selected = machinesFolder:FindFirstChild(name)
+        end
+    end)
+end
+makeToggleRow(scroll6, "Auto Lift", false, function(on)
+    machineData.Lift.running = on
+    if on then
+        machineData.Lift.active = nil
+        runMachine(machineData.Lift)
+    end
+end)
+
+--==============================================================
+--  📦 ВКЛАДКА «ИНВЕНТАРЬ»
+--==============================================================
+
+makeSectionHeader(scroll7, "🥤 БУСТЕРЫ")
+
+local eggEaterRunning = false
+makeToggleRow(scroll7, "Eat All Eggs", false, function(on)
+    eggEaterRunning = on
+    if on then
+        task.spawn(function()
+            while eggEaterRunning do
+                local tool = (player.Character and player.Character:FindFirstChild("Protein Egg"))
+                    or player.Backpack:FindFirstChild("Protein Egg")
+                if tool then
+                    pcall(function() player.muscleEvent:FireServer("proteinEgg", tool) end)
+                end
+                task.wait(0.25)
+            end
+        end)
+    end
+end)
+
+local boostList = {"Tropical Shake", "Energy Shake", "Protein Bar", "TOUGH Bar",
+                   "Protein Shake", "ULTRA Shake", "Energy Bar"}
+local boostRunning = false
+makeToggleRow(scroll7, "Eat All Boosts (лаг)", false, function(on)
+    boostRunning = on
+    if on then
+        task.spawn(function()
+            while boostRunning do
+                for _, name in ipairs(boostList) do
+                    local tool = (player.Character and player.Character:FindFirstChild(name))
+                        or player.Backpack:FindFirstChild(name)
+                    if tool then
+                        local parts = {}
+                        for w in name:gmatch("%S+") do table.insert(parts, w:lower()) end
+                        for i = 2, #parts do
+                            parts[i] = parts[i]:sub(1,1):upper() .. parts[i]:sub(2)
+                        end
+                        for _ = 1, 10 do
+                            pcall(function()
+                                player.muscleEvent:FireServer(table.concat(parts), tool)
+                            end)
+                        end
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+makeSectionHeader(scroll7, "🐾 ПИТОМЦЫ")
+
+local petShopRuntime = game:GetService("ReplicatedStorage"):WaitForChild("shared", 10)
+if petShopRuntime then petShopRuntime = petShopRuntime:WaitForChild("runtime", 10) end
+local petShopFolder = petShopRuntime and petShopRuntime:WaitForChild("cPetShopFolder", 10)
+local petShopRemote = nil
+task.spawn(function()
+    local re = game:GetService("ReplicatedStorage"):WaitForChild("rEvents", 20)
+    if re then petShopRemote = re:FindFirstChild("cPetShopRemote", 20) end
+end)
+
+local petList = {}
+if petShopFolder then
+    for _, item in ipairs(petShopFolder:GetChildren()) do
+        if item:GetAttribute("IsPowerUp") ~= true then
+            table.insert(petList, item.Name)
+        end
+    end
+end
+table.sort(petList)
+
+local selectedPet = nil
+for _, name in ipairs(petList) do
+    makeActionRow(scroll7, "🐾 " .. name, Color3.fromRGB(45, 55, 80), function()
+        selectedPet = name
+    end)
+end
+
+local buyPetRunning = false
+makeToggleRow(scroll7, "Buy Pet (выбранный)", false, function(on)
+    buyPetRunning = on
+    if on then
+        task.spawn(function()
+            while buyPetRunning do
+                if selectedPet and petShopFolder and petShopRemote then
+                    local pet = petShopFolder:FindFirstChild(selectedPet)
+                    if pet then
+                        pcall(function() petShopRemote:InvokeServer(pet) end)
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
+
+local evolveRunning = false
+makeToggleRow(scroll7, "Auto Evolve (выбранный)", false, function(on)
+    evolveRunning = on
+    if on then
+        task.spawn(function()
+            while evolveRunning do
+                if selectedPet then
+                    pcall(function()
+                        game.ReplicatedStorage.rEvents.petEvolveEvent:FireServer("evolvePet", selectedPet)
+                    end)
+                end
+                task.wait(0.5)
+            end
+        end)
+    end
+end)
+
+makeSectionHeader(scroll7, "🎁 ПОДАРКИ")
+
+local selectedGiftPlayer = nil
+local playerListHolder = Instance.new("Frame")
+playerListHolder.Size = UDim2.new(1, 0, 0, 0)
+playerListHolder.AutomaticSize = Enum.AutomaticSize.Y
+playerListHolder.BackgroundTransparency = 1
+playerListHolder.Parent = scroll7
+
+local giftListLayout = Instance.new("UIListLayout")
+giftListLayout.Padding = UDim.new(0, 4)
+giftListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+giftListLayout.Parent = playerListHolder
+
+local function rebuildGiftList()
+    for _, c in ipairs(playerListHolder:GetChildren()) do
         if c:IsA("TextButton") then c:Destroy() end
     end
     for _, other in ipairs(Players:GetPlayers()) do
         if other ~= player then
             local b = Instance.new("TextButton")
-            b.Size = UDim2.new(1, 0, 0, 32)
+            b.Size = UDim2.new(1, 0, 0, 30)
             b.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
             b.Text = other.DisplayName .. " (@" .. other.Name .. ")"
             b.TextColor3 = CONFIG.textColor
-            b.TextSize = 13
+            b.TextSize = 12
             b.Font = Enum.Font.GothamMedium
             b.AutoButtonColor = false
-            b.Parent = playerButtonsHolder
+            b.Parent = playerListHolder
             Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
-
-            b.MouseEnter:Connect(function()
-                b.BackgroundColor3 = Color3.fromRGB(50, 58, 82)
-            end)
-            b.MouseLeave:Connect(function()
-                b.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
-            end)
             b.MouseButton1Click:Connect(function()
-                pickPlayer(other.Name)
+                selectedGiftPlayer = other
             end)
         end
     end
 end
+rebuildGiftList()
+Players.PlayerAdded:Connect(rebuildGiftList)
+Players.PlayerRemoving:Connect(rebuildGiftList)
 
-rebuildPlayerList()
-Players.PlayerAdded:Connect(rebuildPlayerList)
-Players.PlayerRemoving:Connect(rebuildPlayerList)
+local giftAmount = 0
+makeInputRow(scroll7, "Кол-во", "0", function(v)
+    giftAmount = math.max(0, math.floor(v))
+end)
+
+makeActionRow(scroll7, "🎁 Подарить Eggs", Color3.fromRGB(50, 120, 80), function()
+    if not selectedGiftPlayer or giftAmount == 0 then return end
+    task.spawn(function()
+        for _ = 1, giftAmount do
+            local egg = player:FindFirstChild("consumablesFolder")
+                and player.consumablesFolder:FindFirstChild("Protein Egg")
+            if not egg then break end
+            pcall(function()
+                game.ReplicatedStorage.rEvents.giftRemote:InvokeServer("giftRequest", selectedGiftPlayer, egg)
+            end)
+            task.wait(0.1)
+        end
+    end)
+end)
+
+makeActionRow(scroll7, "🥤 Подарить Shakes", Color3.fromRGB(50, 100, 140), function()
+    if not selectedGiftPlayer or giftAmount == 0 then return end
+    task.spawn(function()
+        for _ = 1, giftAmount do
+            local shake = player:FindFirstChild("consumablesFolder")
+                and player.consumablesFolder:FindFirstChild("Tropical Shake")
+            if not shake then break end
+            pcall(function()
+                game.ReplicatedStorage.rEvents.giftRemote:InvokeServer("giftRequest", selectedGiftPlayer, shake)
+            end)
+            task.wait(0.1)
+        end
+    end)
+end)
+
+--==============================================================
+--  📊 ВКЛАДКА «СТАТЫ»
+--==============================================================
+
+local StatsTracker = {
+    startTime = tick(),
+    startValues = {},
+    labels = {},
+    leaderstats = nil,
+    statDefs = {},
+}
+
+task.spawn(function()
+    StatsTracker.leaderstats = player:WaitForChild("leaderstats", 20)
+
+    local ls = StatsTracker.leaderstats
+    StatsTracker.statDefs = {
+        { name = "💪 Strength",   value = ls and ls:WaitForChild("Strength", 10) or nil },
+        { name = "♻️ Rebirths",   value = ls and ls:WaitForChild("Rebirths", 10) or nil },
+        { name = "🛡️ Durability", value = player:WaitForChild("Durability", 10) },
+        { name = "☠️ Kills",      value = ls and ls:WaitForChild("Kills", 10) or nil },
+        { name = "⚡ Agility",    value = player:WaitForChild("Agility", 10) },
+        { name = "😈 Evil Karma", value = player:WaitForChild("evilKarma", 10) },
+        { name = "😇 Good Karma", value = player:WaitForChild("goodKarma", 10) },
+        { name = "🥊 Brawls",     value = ls and ls:WaitForChild("Brawls", 10) or nil },
+    }
+
+    for _, def in ipairs(StatsTracker.statDefs) do
+        if def.value then
+            StatsTracker.startValues[def.name] = def.value.Value
+        else
+            StatsTracker.startValues[def.name] = 0
+        end
+    end
+end)
+
+makeSectionHeader(scroll8, "⏱️ ВРЕМЯ СЕССИИ")
+local timeLabel = makeInfoLabel(scroll8, "0d 0h 0m 0s", CONFIG.textColor)
 
 task.spawn(function()
     while true do
-        if spectatePlayer and spectatePlayer.Parent then
-            local ls = spectatePlayer:FindFirstChild("leaderstats")
-            local function getNum(parent, name)
-                local v = parent and parent:FindFirstChild(name)
-                return v and v.Value or 0
-            end
-            local str = getNum(ls, "Strength")
-            local reb = getNum(ls, "Rebirths")
-            local kills = getNum(ls, "Kills")
+        local e = tick() - StatsTracker.startTime
+        timeLabel.Text = string.format("%dd %dh %dm %ds",
+            math.floor(e / 86400),
+            math.floor((e % 86400) / 3600),
+            math.floor((e % 3600) / 60),
+            math.floor(e % 60))
+        task.wait(1)
+    end
+end)
 
-            local function fmt(n)
-                if n >= 1e18 then return string.format("%.1fQi", n / 1e18) end
-                if n >= 1e15 then return string.format("%.1fQa", n / 1e15) end
-                if n >= 1e12 then return string.format("%.1fT", n / 1e12) end
-                if n >= 1e9 then return string.format("%.1fB", n / 1e9) end
-                if n >= 1e6 then return string.format("%.1fM", n / 1e6) end
-                if n >= 1e3 then return string.format("%.1fK", n / 1e3) end
-                return tostring(math.floor(n))
-            end
+makeSectionHeader(scroll8, "📊 ТВОИ СТАТЫ")
 
-            statsLabel.Text = ("👤 %s (@%s)"):format(spectatePlayer.DisplayName, spectatePlayer.Name)
-            statsLabel2.Text = ("💪 Strength: %s"):format(fmt(str))
-            statsLabel3.Text = ("♻️ Rebirths: %s   ☠️ Kills: %s"):format(fmt(reb), fmt(kills))
+local function fmtNum(n)
+    if n >= 1e18 then return string.format("%.1fQi", n / 1e18) end
+    if n >= 1e15 then return string.format("%.1fQa", n / 1e15) end
+    if n >= 1e12 then return string.format("%.1fT", n / 1e12) end
+    if n >= 1e9 then return string.format("%.1fB", n / 1e9) end
+    if n >= 1e6 then return string.format("%.1fM", n / 1e6) end
+    if n >= 1e3 then return string.format("%.1fK", n / 1e3) end
+    return tostring(math.floor(n))
+end
+
+local function fmtCommas(n)
+    local s = tostring(math.floor(n))
+    while true do
+        s, k = s:gsub("^(-?%d+)(%d%d%d)", "%1.%2")
+        if k == 0 then break end
+    end
+    return s
+end
+
+task.spawn(function()
+    task.wait(2)
+    for _, def in ipairs(StatsTracker.statDefs) do
+        StatsTracker.labels[def.name] = makeInfoLabel(scroll8, def.name .. ": --", CONFIG.textColor)
+    end
+
+    while true do
+        for _, def in ipairs(StatsTracker.statDefs) do
+            if def.value and StatsTracker.labels[def.name] then
+                local cur = def.value.Value
+                local start = StatsTracker.startValues[def.name] or cur
+                local gained = cur - start
+                StatsTracker.labels[def.name].Text = ("%s: %s | +%s"):format(
+                    def.name, fmtNum(cur), fmtNum(gained))
+            end
         end
         task.wait(1)
     end
 end)
 
--- Spectate
-local function spectateTarget(target)
-    if not target or not target.Character then return end
-    local cam = Workspace.CurrentCamera
-    local hum = target.Character:FindFirstChildOfClass("Humanoid")
-    if cam and hum then
-        cam.CameraSubject = hum
-        cam.CameraType = Enum.CameraType.Custom
-    end
+makeSectionHeader(scroll8, "🔍 ПРОСМОТР ИГРОКА")
+
+local viewedPlayer = nil
+local viewNameLabel = makeInfoLabel(scroll8, "👤 Игрок: не выбран", CONFIG.textColor)
+local viewStatsLabels = {}
+for _, def in ipairs(StatsTracker.statDefs) do
+    viewStatsLabels[def.name] = makeInfoLabel(scroll8, def.name .. ": --", Color3.fromRGB(150, 155, 180))
 end
 
-makeToggleRow(scroll5, "Spectate (следить)", false, function(on)
-    if on then
-        if spectatePlayer then
-            spectateTarget(spectatePlayer)
-        end
-    else
-        local myHum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-        local cam = Workspace.CurrentCamera
-        if cam and myHum then
-            cam.CameraSubject = myHum
-            cam.CameraType = Enum.CameraType.Custom
+local viewerHolder = Instance.new("Frame")
+viewerHolder.Size = UDim2.new(1, 0, 0, 0)
+viewerHolder.AutomaticSize = Enum.AutomaticSize.Y
+viewerHolder.BackgroundTransparency = 1
+viewerHolder.Parent = scroll8
+
+local vListLayout = Instance.new("UIListLayout")
+vListLayout.Padding = UDim.new(0, 4)
+vListLayout.Parent = viewerHolder
+
+local function rebuildViewerList()
+    for _, c in ipairs(viewerHolder:GetChildren()) do
+        if c:IsA("TextButton") then c:Destroy() end
+    end
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player then
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(1, 0, 0, 28)
+            b.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+            b.Text = other.DisplayName .. " (@" .. other.Name .. ")"
+            b.TextColor3 = CONFIG.textColor
+            b.TextSize = 12
+            b.Font = Enum.Font.GothamMedium
+            b.AutoButtonColor = false
+            b.Parent = viewerHolder
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+            b.MouseButton1Click:Connect(function()
+                viewedPlayer = other
+            end)
         end
     end
-end)
+end
+rebuildViewerList()
+Players.PlayerAdded:Connect(rebuildViewerList)
+Players.PlayerRemoving:Connect(rebuildViewerList)
 
 task.spawn(function()
     while true do
-        if _G.__SpectateOn and spectatePlayer then
-            spectateTarget(spectatePlayer)
+        if viewedPlayer and viewedPlayer.Parent then
+            viewNameLabel.Text = ("👤 %s (@%s)"):format(viewedPlayer.DisplayName, viewedPlayer.Name)
+
+            local ls = viewedPlayer:FindFirstChild("leaderstats")
+            local function get(parent, name)
+                local v = parent and parent:FindFirstChild(name)
+                return v and v.Value or 0
+            end
+
+            local map = {
+                ["💪 Strength"] = get(ls, "Strength"),
+                ["♻️ Rebirths"] = get(ls, "Rebirths"),
+                ["🛡️ Durability"] = get(viewedPlayer, "Durability"),
+                ["☠️ Kills"] = get(ls, "Kills"),
+                ["⚡ Agility"] = get(viewedPlayer, "Agility"),
+                ["😈 Evil Karma"] = get(viewedPlayer, "evilKarma"),
+                ["😇 Good Karma"] = get(viewedPlayer, "goodKarma"),
+                ["🥊 Brawls"] = get(ls, "Brawls"),
+            }
+
+            for name, value in pairs(map) do
+                if viewStatsLabels[name] then
+                    viewStatsLabels[name].Text = ("%s: %s (%s)"):format(name, fmtNum(value), fmtCommas(value))
+                end
+            end
+        else
+            viewNameLabel.Text = "👤 Игрок: не выбран"
         end
         task.wait(0.5)
     end
 end)
 
-print("[TeleportMenu] Готово. 5 вкладок, T — открыть меню.")
+print("[TeleportMenu] Готово. 8 вкладок, T — открыть меню.")
 
 print("[TeleportMenu] Drag & Drop включён: меню — за заголовок, кнопка — за саму себя.")
