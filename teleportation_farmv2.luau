@@ -800,7 +800,26 @@ local function toggleMenu()
     if isOpen then closeMenu() else openMenu() end
 end
 
-toggleButton.MouseButton1Click:Connect(toggleMenu)
+local clickStart = nil
+
+toggleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        clickStart = input.Position
+    end
+end)
+
+toggleButton.InputEnded:Connect(function(input)
+    if not clickStart then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        local moved = (input.Position - clickStart).Magnitude
+        if moved < 6 then
+            toggleMenu()
+        end
+        clickStart = nil
+    end
+end)
 closeButton.MouseButton1Click:Connect(closeMenu)
 
 toggleButton.MouseEnter:Connect(function()
