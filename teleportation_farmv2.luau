@@ -193,7 +193,7 @@ tabBarGradient.Parent = tabBar
 
 -- Индикатор-подсветка активной вкладки (двигается плавно)
 local tabIndicator = Instance.new("Frame")
-tabIndicator.Size = UDim2.new(1/3, -4, 1, -6)
+tabIndicator.Size = UDim2.new(1/5, -4, 1, -6)
 tabIndicator.Position = UDim2.new(0, 3, 0, 3)
 tabIndicator.BackgroundColor3 = CONFIG.accentColor
 tabIndicator.BorderSizePixel = 0
@@ -224,13 +224,18 @@ local function makeTabButton(text, xOffset)
     return b
 end
 
-local tab1Button = makeTabButton("locations", 0)
-local tab2Button = makeTabButton("my", 0)
-local tab3Button = makeTabButton("farm", 0)
+local tab1Button = makeTabButton("Locations", 0)
+local tab2Button = makeTabButton("My", 0)
+local tab3Button = makeTabButton("Farm", 0)
+local tab4Button = makeTabButton("Utilities", 0)
+local tab5Button = makeTabButton("PvP", 0)
 
-tab1Button.Size = UDim2.new(1/3, 0, 1, 0); tab1Button.Position = UDim2.new(0, 0, 0, 0)
-tab2Button.Size = UDim2.new(1/3, 0, 1, 0); tab2Button.Position = UDim2.new(1/3, 0, 0, 0)
-tab3Button.Size = UDim2.new(1/3, 0, 1, 0); tab3Button.Position = UDim2.new(2/3, 0, 0, 0)
+local TAB_W = 1/5
+tab1Button.Size = UDim2.new(TAB_W, 0, 1, 0); tab1Button.Position = UDim2.new(TAB_W * 0, 0, 0, 0)
+tab2Button.Size = UDim2.new(TAB_W, 0, 1, 0); tab2Button.Position = UDim2.new(TAB_W * 1, 0, 0, 0)
+tab3Button.Size = UDim2.new(TAB_W, 0, 1, 0); tab3Button.Position = UDim2.new(TAB_W * 2, 0, 0, 0)
+tab4Button.Size = UDim2.new(TAB_W, 0, 1, 0); tab4Button.Position = UDim2.new(TAB_W * 3, 0, 0, 0)
+tab5Button.Size = UDim2.new(TAB_W, 0, 1, 0); tab5Button.Position = UDim2.new(TAB_W * 4, 0, 0, 0)
 
 ---------------------------------------------------------------
 -- КОНТЕЙНЕР КОНТЕНТА (под вкладками)
@@ -287,9 +292,23 @@ tab3Frame.BackgroundTransparency = 1
 tab3Frame.Visible = false
 tab3Frame.Parent = contentHolder
 
+local tab4Frame = Instance.new("Frame")
+tab4Frame.Size = UDim2.fromScale(1, 1)
+tab4Frame.BackgroundTransparency = 1
+tab4Frame.Visible = false
+tab4Frame.Parent = contentHolder
+
+local tab5Frame = Instance.new("Frame")
+tab5Frame.Size = UDim2.fromScale(1, 1)
+tab5Frame.BackgroundTransparency = 1
+tab5Frame.Visible = false
+tab5Frame.Parent = contentHolder
+
 local scroll1, _ = makeScrollingList(tab1Frame)
 local scroll2, _ = makeScrollingList(tab2Frame)
 local scroll3, _ = makeScrollingList(tab3Frame)
+local scroll4, _ = makeScrollingList(tab4Frame)
+local scroll5, _ = makeScrollingList(tab5Frame)
 
 ---------------------------------------------------------------
 -- ПАНЕЛЬ ДЕЙСТВИЙ ДЛЯ ВКЛАДКИ 2 (добавить/выбрать/очистить)
@@ -513,14 +532,7 @@ local function switchTab(tabNum)
     if tabNum == currentTab then return end
     currentTab = tabNum
 
-    local targetX
-    if tabNum == 1 then
-        targetX = UDim2.new(0, 3, 0, 3)
-    elseif tabNum == 2 then
-        targetX = UDim2.new(1/3, 1, 0, 3)
-    else
-        targetX = UDim2.new(2/3, 1, 0, 3)
-    end
+    local targetX = UDim2.new((tabNum - 1) / 5, tabNum == 1 and 3 or 1, 0, 3)
 
     TweenService:Create(tabIndicator, TweenInfo.new(0.28, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Position = targetX,
@@ -530,7 +542,8 @@ local function switchTab(tabNum)
     local inactiveColor = Color3.fromRGB(160, 165, 190)
 
     for _, pair in ipairs({
-        {tab1Button, 1}, {tab2Button, 2}, {tab3Button, 3}
+        {tab1Button, 1}, {tab2Button, 2}, {tab3Button, 3},
+        {tab4Button, 4}, {tab5Button, 5}
     }) do
         TweenService:Create(pair[1], TweenInfo.new(0.2), {
             TextColor3 = (tabNum == pair[2]) and activeColor or inactiveColor,
@@ -540,9 +553,11 @@ local function switchTab(tabNum)
     tab1Frame.Visible = (tabNum == 1)
     tab2Frame.Visible = (tabNum == 2)
     tab3Frame.Visible = (tabNum == 3)
+    tab4Frame.Visible = (tabNum == 4)
+    tab5Frame.Visible = (tabNum == 5)
     actionBar.Visible = (tabNum == 2)
 
-    local activeFrame = (tabNum == 1) and tab1Frame or (tabNum == 2) and tab2Frame or tab3Frame
+    local activeFrame = ({tab1Frame, tab2Frame, tab3Frame, tab4Frame, tab5Frame})[tabNum]
     activeFrame.Position = UDim2.new(0, (tabNum == 1) and -10 or 10, 0, 0)
     TweenService:Create(activeFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
         Position = UDim2.new(0, 0, 0, 0),
@@ -552,6 +567,8 @@ end
 tab1Button.MouseButton1Click:Connect(function() switchTab(1) end)
 tab2Button.MouseButton1Click:Connect(function() switchTab(2) end)
 tab3Button.MouseButton1Click:Connect(function() switchTab(3) end)
+tab4Button.MouseButton1Click:Connect(function() switchTab(4) end)
+tab5Button.MouseButton1Click:Connect(function() switchTab(5) end)
 
 tab1Button.TextColor3 = Color3.new(1, 1, 1)
 
@@ -1428,5 +1445,694 @@ makeDraggable(mainFrame, title)
 
 -- Делаем кнопку-открывашку перетаскиваемой
 makeDraggable(toggleButton)
+
+--==============================================================
+--  🎨 ОБЩИЕ UI-ХЕЛПЕРЫ (для всех вкладок)
+--==============================================================
+local function makeSectionHeader(parent, text)
+    local h = Instance.new("TextLabel")
+    h.Size = UDim2.new(1, 0, 0, 28)
+    h.BackgroundTransparency = 1
+    h.Text = text
+    h.TextColor3 = CONFIG.accentColor
+    h.TextSize = 13
+    h.Font = Enum.Font.GothamBold
+    h.TextXAlignment = Enum.TextXAlignment.Left
+    h.Parent = parent
+    return h
+end
+
+local function makeToggleRow(parent, labelText, initial, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 46)
+    row.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+    row.BorderSizePixel = 0
+    row.Parent = parent
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = CONFIG.accentColor
+    stroke.Thickness = 1
+    stroke.Transparency = 0.8
+    stroke.Parent = row
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -80, 1, 0)
+    label.Position = UDim2.new(0, 15, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = CONFIG.textColor
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamMedium
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextTruncate = Enum.TextTruncate.AtEnd
+    label.Parent = row
+
+    local track = Instance.new("Frame")
+    track.Size = UDim2.fromOffset(48, 24)
+    track.Position = UDim2.new(1, -62, 0.5, -12)
+    track.BackgroundColor3 = Color3.fromRGB(60, 65, 80)
+    track.BorderSizePixel = 0
+    track.Parent = row
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.fromOffset(18, 18)
+    knob.Position = UDim2.new(0, 3, 0.5, -9)
+    knob.BackgroundColor3 = Color3.new(1, 1, 1)
+    knob.BorderSizePixel = 0
+    knob.Parent = track
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+    local state = initial or false
+    local info = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+    local function apply(on, animate)
+        local ti = animate and info or TweenInfo.new(0)
+        if on then
+            TweenService:Create(track, ti, { BackgroundColor3 = CONFIG.accentColor }):Play()
+            TweenService:Create(knob, ti, { Position = UDim2.new(1, -21, 0.5, -9) }):Play()
+        else
+            TweenService:Create(track, ti, { BackgroundColor3 = Color3.fromRGB(60, 65, 80) }):Play()
+            TweenService:Create(knob, ti, { Position = UDim2.new(0, 3, 0.5, -9) }):Play()
+        end
+    end
+
+    apply(state, false)
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.fromScale(1, 1)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = row
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(row, info, { BackgroundColor3 = Color3.fromRGB(50, 58, 82) }):Play()
+        TweenService:Create(stroke, info, { Transparency = 0.3 }):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(row, info, { BackgroundColor3 = Color3.fromRGB(38, 42, 58) }):Play()
+        TweenService:Create(stroke, info, { Transparency = 0.8 }):Play()
+    end)
+
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        apply(state, true)
+        if callback then callback(state) end
+    end)
+
+    return {
+        Set = function(on) state = on; apply(on, true); if callback then callback(on) end end,
+        Get = function() return state end,
+    }
+end
+
+local function makeActionRow(parent, labelText, color, callback)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, 0, 0, 42)
+    b.BackgroundColor3 = color
+    b.Text = labelText
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.TextSize = 14
+    b.Font = Enum.Font.GothamBold
+    b.AutoButtonColor = false
+    b.Parent = parent
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 10)
+
+    local st = Instance.new("UIStroke")
+    st.Color = Color3.new(1, 1, 1)
+    st.Thickness = 1
+    st.Transparency = 0.75
+    st.Parent = b
+
+    local info = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
+    b.MouseEnter:Connect(function()
+        TweenService:Create(b, info, { Size = UDim2.new(1, 4, 0, 42) }):Play()
+    end)
+    b.MouseLeave:Connect(function()
+        TweenService:Create(b, info, { Size = UDim2.new(1, 0, 0, 42) }):Play()
+    end)
+
+    b.MouseButton1Click:Connect(function()
+        if callback then callback() end
+    end)
+    return b
+end
+
+local function makeInfoLabel(parent, text, color)
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, 0, 0, 22)
+    l.BackgroundTransparency = 1
+    l.Text = text
+    l.TextColor3 = color or CONFIG.textColor
+    l.TextSize = 13
+    l.Font = Enum.Font.GothamMedium
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.TextTruncate = Enum.TextTruncate.AtEnd
+    l.Parent = parent
+    return l
+end
+
+local function makeInputRow(parent, labelText, defaultText, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 42)
+    row.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+    row.BorderSizePixel = 0
+    row.Parent = parent
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = CONFIG.accentColor
+    stroke.Thickness = 1
+    stroke.Transparency = 0.8
+    stroke.Parent = row
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.5, -15, 1, 0)
+    label.Position = UDim2.new(0, 15, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = CONFIG.textColor
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamMedium
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.TextTruncate = Enum.TextTruncate.AtEnd
+    label.Parent = row
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0.5, -20, 0, 28)
+    box.Position = UDim2.new(0.5, 5, 0.5, -14)
+    box.BackgroundColor3 = Color3.fromRGB(28, 32, 44)
+    box.Text = tostring(defaultText or "")
+    box.PlaceholderText = "Введи + Enter"
+    box.TextColor3 = CONFIG.textColor
+    box.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+    box.TextSize = 14
+    box.Font = Enum.Font.Gotham
+    box.ClearTextOnFocus = false
+    box.Parent = row
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+
+    box.FocusLost:Connect(function(enterPressed)
+        if enterPressed then
+            local v = tonumber(box.Text)
+            if v and callback then callback(v) end
+        end
+    end)
+
+    return box
+end
+
+--==============================================================
+--  🎮 ВКЛАДКА «УТИЛИТЫ»
+--==============================================================
+local UIS = UserInputService
+local Lighting = game:GetService("Lighting")
+local Workspace = workspace
+
+makeSectionHeader(scroll4, "👤 ПЕРСОНАЖ")
+
+local charSettings = { Size = 2, Speed = 120, FOV = 70 }
+local sizeEnabled, speedEnabled, fovEnabled = false, false, false
+
+local changeSpeedSizeRemote = nil
+task.spawn(function()
+    local rEvents = game:GetService("ReplicatedStorage"):WaitForChild("rEvents", 20)
+    if rEvents then
+        changeSpeedSizeRemote = rEvents:FindFirstChild("changeSpeedSizeRemote", 20)
+    end
+end)
+
+makeInputRow(scroll4, "Размер (1-10)", "2", function(v)
+    charSettings.Size = v
+end)
+makeToggleRow(scroll4, "Применить размер", false, function(on)
+    sizeEnabled = on
+end)
+
+makeInputRow(scroll4, "Скорость", "120", function(v)
+    charSettings.Speed = v
+end)
+makeToggleRow(scroll4, "Применить скорость", false, function(on)
+    speedEnabled = on
+end)
+
+makeInputRow(scroll4, "FOV (1-120)", "70", function(v)
+    charSettings.FOV = math.clamp(v, 1, 120)
+end)
+makeToggleRow(scroll4, "Применить FOV", false, function(on)
+    fovEnabled = on
+    local cam = Workspace.CurrentCamera
+    if cam then cam.FieldOfView = on and charSettings.FOV or 70 end
+end)
+
+task.spawn(function()
+    while true do
+        if changeSpeedSizeRemote then
+            if sizeEnabled then
+                pcall(function() changeSpeedSizeRemote:InvokeServer("changeSize", charSettings.Size) end)
+            end
+            if speedEnabled then
+                pcall(function() changeSpeedSizeRemote:InvokeServer("changeSpeed", charSettings.Speed) end)
+            end
+        end
+        if fovEnabled then
+            local cam = Workspace.CurrentCamera
+            if cam then cam.FieldOfView = charSettings.FOV end
+        end
+        task.wait(0.05)
+    end
+end)
+
+makeSectionHeader(scroll4, "🛡️ ЗАЩИТА")
+
+-- Anti-Fling
+local antiFlingEnabled = false
+
+local function ensureAntiFling()
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    if not antiFlingEnabled then return end
+    if hrp:FindFirstChild("AntiFlingBV") then return end
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "AntiFlingBV"
+    bv.MaxForce = Vector3.new(100000, 0, 100000)
+    bv.Velocity = Vector3.zero
+    bv.P = 1250
+    bv.Parent = hrp
+end
+
+local function removeAntiFling()
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp and hrp:FindFirstChild("AntiFlingBV") then
+        hrp.AntiFlingBV:Destroy()
+    end
+end
+
+makeToggleRow(scroll4, "Anti-Fling", false, function(on)
+    antiFlingEnabled = on
+    if on then ensureAntiFling() else removeAntiFling() end
+end)
+
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if antiFlingEnabled then ensureAntiFling() end
+end)
+
+task.spawn(function()
+    while true do
+        if antiFlingEnabled then ensureAntiFling() end
+        task.wait(0.5)
+    end
+end)
+
+-- Walk on Water
+local waterParts = {}
+task.spawn(function()
+    local partSize = 2048
+    local distance = 50000
+    local startPos = Vector3.new(-2, -9.5, -2)
+    for x = 0, math.ceil(distance / partSize) - 1 do
+        for z = 0, math.ceil(distance / partSize) - 1 do
+            for _, offset in ipairs({
+                {x * partSize, z * partSize},
+                {-x * partSize, z * partSize},
+                {-x * partSize, -z * partSize},
+                {x * partSize, -z * partSize}
+            }) do
+                local p = Instance.new("Part")
+                p.Size = Vector3.new(partSize, 1, partSize)
+                p.Position = startPos + Vector3.new(offset[1], 0, offset[2])
+                p.Anchored = true
+                p.Transparency = 1
+                p.CanCollide = false
+                p.Parent = Workspace
+                table.insert(waterParts, p)
+            end
+        end
+    end
+end)
+
+makeToggleRow(scroll4, "Walk on Water", true, function(on)
+    for _, p in ipairs(waterParts) do
+        if p and p.Parent then p.CanCollide = on end
+    end
+end):Set(true)
+
+makeSectionHeader(scroll4, "👁️ ВИЗУАЛ")
+
+local showPetsEvent = nil
+local savePlayerSizeEvent = nil
+task.spawn(function()
+    local rEvents = game:GetService("ReplicatedStorage"):WaitForChild("rEvents", 20)
+    if rEvents then
+        showPetsEvent = rEvents:FindFirstChild("showPetsEvent", 20)
+        savePlayerSizeEvent = rEvents:FindFirstChild("savePlayerSizeEvent", 20)
+    end
+end)
+
+makeToggleRow(scroll4, "Hide Pets", true, function(on)
+    if showPetsEvent then
+        showPetsEvent:FireServer(on and "hidePets" or "showPets")
+    end
+end)
+
+makeToggleRow(scroll4, "Hide Popups", true, function(on)
+    if savePlayerSizeEvent then
+        savePlayerSizeEvent:FireServer("showPopupsOption")
+    end
+end)
+
+makeSectionHeader(scroll4, "⚡ РАЗНОЕ")
+
+makeToggleRow(scroll4, "Infinite Jump", false, function(on)
+    _G.InfiniteJump = on
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if _G.InfiniteJump then
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+makeActionRow(scroll4, "🌙 Ночь", Color3.fromRGB(40, 55, 100), function()
+    Lighting.ClockTime = 0
+end)
+makeActionRow(scroll4, "☀️ День", Color3.fromRGB(120, 100, 40), function()
+    Lighting.ClockTime = 12
+end)
+
+-- Fortune Wheel
+local fortuneWheelRunning = false
+task.spawn(function()
+    while true do
+        if fortuneWheelRunning then
+            pcall(function()
+                local rEvents = game:GetService("ReplicatedStorage"):FindFirstChild("rEvents")
+                local remote = rEvents and rEvents:FindFirstChild("openFortuneWheelRemote")
+                local chances = game:GetService("ReplicatedStorage").shared.catalogs.fortuneWheelChances["Fortune Wheel"]
+                if remote and chances then
+                    remote:InvokeServer("openFortuneWheel", chances)
+                end
+            end)
+            task.wait(1)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+makeToggleRow(scroll4, "Spin Fortune Wheel", false, function(on)
+    fortuneWheelRunning = on
+end)
+
+--==============================================================
+--  ⚔️ ВКЛАДКА «PVP»
+--==============================================================
+local RunService = game:GetService("RunService")
+
+local function isAlive(p)
+    return p and p.Character
+        and p.Character:FindFirstChild("HumanoidRootPart")
+        and p.Character:FindFirstChildOfClass("Humanoid")
+        and p.Character.Humanoid.Health > 0
+end
+
+local function isProtected(p)
+    if not p or not p.Character then return false end
+    if p.Character:FindFirstChildOfClass("ForceField") then return true end
+    if p.Character:FindFirstChild("spawnProtectionHighlight") then return true end
+    local until_ = p.Character:GetAttribute("SpawnProtectedUntil")
+    return typeof(until_) == "number" and Workspace:GetServerTimeNow() < until_
+end
+
+local whitelisted = {}
+local function isWhitelisted(p)
+    for _, n in ipairs(whitelisted) do
+        if n:lower() == p.Name:lower() then return true end
+    end
+    return false
+end
+
+local function punchTarget(target)
+    local myChar = player.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local targetHRP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP or not targetHRP then return end
+
+    myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 3.5, 0)
+    myHRP.AssemblyLinearVelocity = Vector3.zero
+
+    task.wait()
+    local hand = myChar:FindFirstChild("LeftHand") or myChar:FindFirstChild("RightHand")
+    if not hand then return end
+
+    pcall(function()
+        firetouchinterest(targetHRP, hand, 0)
+        firetouchinterest(targetHRP, hand, 1)
+        player.muscleEvent:FireServer("punch", hand.Name == "LeftHand" and "leftHand" or "rightHand")
+    end)
+end
+
+makeSectionHeader(scroll5, "⚔️ АТАКА")
+
+local killAuraRunning = false
+local killAuraRange = 20
+
+makeToggleRow(scroll5, "Kill Aura (авто-удар)", false, function(on)
+    killAuraRunning = on
+end)
+
+makeInputRow(scroll5, "Радиус ауры", "20", function(v)
+    killAuraRange = math.clamp(v, 5, 140)
+end)
+
+task.spawn(function()
+    while true do
+        if killAuraRunning then
+            local myChar = player.Character
+            local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if myHRP then
+                for _, other in ipairs(Players:GetPlayers()) do
+                    if other ~= player and not isWhitelisted(other) and isAlive(other) and not isProtected(other) then
+                        local oHRP = other.Character.HumanoidRootPart
+                        if (myHRP.Position - oHRP.Position).Magnitude <= killAuraRange then
+                            punchTarget(other)
+                        end
+                    end
+                end
+            end
+            task.wait(0.05)
+        else
+            task.wait(0.2)
+        end
+    end
+end)
+
+makeToggleRow(scroll5, "Kill Everyone (без whitelist)", false, function(on)
+    _G.KillEveryone = on
+    if on then
+        task.spawn(function()
+            while _G.KillEveryone do
+                for _, other in ipairs(Players:GetPlayers()) do
+                    if other ~= player and not isWhitelisted(other) and isAlive(other) and not isProtected(other) then
+                        punchTarget(other)
+                        RunService.Heartbeat:Wait()
+                    end
+                end
+                task.wait(0.05)
+            end
+        end)
+    end
+end)
+
+makeSectionHeader(scroll5, "🛡️ WHITELIST")
+
+local whitelistInput = makeInputRow(scroll5, "Добавить в whitelist", "", function(v)
+    if v and type(v) == "number" then return end
+end)
+
+-- Используем textbox напрямую — имя игрока, не число
+whitelistInput.PlaceholderText = "Ник игрока + Enter"
+whitelistInput.FocusLost:Connect(function(enter)
+    if enter then
+        local name = whitelistInput.Text:gsub("%s+", "")
+        if #name > 0 then
+            table.insert(whitelisted, name)
+            whitelistInput.Text = ""
+        end
+    end
+end)
+
+local whitelistLabel = makeInfoLabel(scroll5, "Whitelist: пусто", Color3.fromRGB(150, 155, 180))
+
+makeActionRow(scroll5, "🧹 Очистить whitelist", Color3.fromRGB(90, 45, 55), function()
+    whitelisted = {}
+end)
+
+makeToggleRow(scroll5, "Whitelist Friends", false, function(on)
+    _G.WhitelistFriends = on
+    if on then
+        for _, other in ipairs(Players:GetPlayers()) do
+            if other ~= player and other:IsFriendsWith(player.UserId) and not isWhitelisted(other) then
+                table.insert(whitelisted, other.Name)
+            end
+        end
+        task.spawn(function()
+            while _G.WhitelistFriends do
+                for _, other in ipairs(Players:GetPlayers()) do
+                    if other ~= player and other:IsFriendsWith(player.UserId) and not isWhitelisted(other) then
+                        table.insert(whitelisted, other.Name)
+                    end
+                end
+                task.wait(3)
+            end
+        end)
+    end
+end)
+
+task.spawn(function()
+    while true do
+        whitelistLabel.Text = #whitelisted == 0
+            and "Whitelist: пусто"
+            or "Whitelist: " .. table.concat(whitelisted, ", ")
+        task.wait(1)
+    end
+end)
+
+makeSectionHeader(scroll5, "📊 СТАТЫ ИГРОКА")
+
+local statsLabel = makeInfoLabel(scroll5, "Выбери игрока выше", Color3.fromRGB(150, 155, 180))
+local statsLabel2 = makeInfoLabel(scroll5, "", Color3.fromRGB(150, 155, 180))
+local statsLabel3 = makeInfoLabel(scroll5, "", Color3.fromRGB(150, 155, 180))
+
+local spectatePlayer = nil
+
+local function pickPlayer(name)
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other.Name == name or other.DisplayName == name then
+            spectatePlayer = other
+            return
+        end
+    end
+    spectatePlayer = nil
+end
+
+-- Кнопки для быстрого выбора игрока
+local playerButtonsHolder = Instance.new("Frame")
+playerButtonsHolder.Size = UDim2.new(1, 0, 0, 0)
+playerButtonsHolder.AutomaticSize = Enum.AutomaticSize.Y
+playerButtonsHolder.BackgroundTransparency = 1
+playerButtonsHolder.Parent = scroll5
+
+local pListLayout = Instance.new("UIListLayout")
+pListLayout.Padding = UDim.new(0, 4)
+pListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+pListLayout.Parent = playerButtonsHolder
+
+local function rebuildPlayerList()
+    for _, c in ipairs(playerButtonsHolder:GetChildren()) do
+        if c:IsA("TextButton") then c:Destroy() end
+    end
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player then
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(1, 0, 0, 32)
+            b.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+            b.Text = other.DisplayName .. " (@" .. other.Name .. ")"
+            b.TextColor3 = CONFIG.textColor
+            b.TextSize = 13
+            b.Font = Enum.Font.GothamMedium
+            b.AutoButtonColor = false
+            b.Parent = playerButtonsHolder
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 8)
+
+            b.MouseEnter:Connect(function()
+                b.BackgroundColor3 = Color3.fromRGB(50, 58, 82)
+            end)
+            b.MouseLeave:Connect(function()
+                b.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+            end)
+            b.MouseButton1Click:Connect(function()
+                pickPlayer(other.Name)
+            end)
+        end
+    end
+end
+
+rebuildPlayerList()
+Players.PlayerAdded:Connect(rebuildPlayerList)
+Players.PlayerRemoving:Connect(rebuildPlayerList)
+
+task.spawn(function()
+    while true do
+        if spectatePlayer and spectatePlayer.Parent then
+            local ls = spectatePlayer:FindFirstChild("leaderstats")
+            local function getNum(parent, name)
+                local v = parent and parent:FindFirstChild(name)
+                return v and v.Value or 0
+            end
+            local str = getNum(ls, "Strength")
+            local reb = getNum(ls, "Rebirths")
+            local kills = getNum(ls, "Kills")
+
+            local function fmt(n)
+                if n >= 1e18 then return string.format("%.1fQi", n / 1e18) end
+                if n >= 1e15 then return string.format("%.1fQa", n / 1e15) end
+                if n >= 1e12 then return string.format("%.1fT", n / 1e12) end
+                if n >= 1e9 then return string.format("%.1fB", n / 1e9) end
+                if n >= 1e6 then return string.format("%.1fM", n / 1e6) end
+                if n >= 1e3 then return string.format("%.1fK", n / 1e3) end
+                return tostring(math.floor(n))
+            end
+
+            statsLabel.Text = ("👤 %s (@%s)"):format(spectatePlayer.DisplayName, spectatePlayer.Name)
+            statsLabel2.Text = ("💪 Strength: %s"):format(fmt(str))
+            statsLabel3.Text = ("♻️ Rebirths: %s   ☠️ Kills: %s"):format(fmt(reb), fmt(kills))
+        end
+        task.wait(1)
+    end
+end)
+
+-- Spectate
+local function spectateTarget(target)
+    if not target or not target.Character then return end
+    local cam = Workspace.CurrentCamera
+    local hum = target.Character:FindFirstChildOfClass("Humanoid")
+    if cam and hum then
+        cam.CameraSubject = hum
+        cam.CameraType = Enum.CameraType.Custom
+    end
+end
+
+makeToggleRow(scroll5, "Spectate (следить)", false, function(on)
+    if on then
+        if spectatePlayer then
+            spectateTarget(spectatePlayer)
+        end
+    else
+        local myHum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        local cam = Workspace.CurrentCamera
+        if cam and myHum then
+            cam.CameraSubject = myHum
+            cam.CameraType = Enum.CameraType.Custom
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if _G.__SpectateOn and spectatePlayer then
+            spectateTarget(spectatePlayer)
+        end
+        task.wait(0.5)
+    end
+end)
+
+print("[TeleportMenu] Готово. 5 вкладок, T — открыть меню.")
 
 print("[TeleportMenu] Drag & Drop включён: меню — за заголовок, кнопка — за саму себя.")
