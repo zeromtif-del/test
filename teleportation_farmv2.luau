@@ -454,19 +454,13 @@ local function createTeleportButton(data, parentScroll, order, allowDelete, inde
 
     local tInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, tInfo, { BackgroundColor3 = Color3.fromRGB(50, 58, 82) }):Play()
-        TweenService:Create(grad, tInfo, { Transparency = NumberSequence.new(0.85) }):Play()
-        TweenService:Create(stroke, tInfo, { Transparency = 0.2 }):Play()
-        TweenService:Create(btn, tInfo, { Size = UDim2.new(1, 4, 0, CONFIG.buttonHeight) }):Play()
-    end)
+toggleButton.MouseEnter:Connect(function()
+    toggleButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+end)
 
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, tInfo, { BackgroundColor3 = Color3.fromRGB(38, 42, 58) }):Play()
-        TweenService:Create(grad, tInfo, { Transparency = NumberSequence.new(1) }):Play()
-        TweenService:Create(stroke, tInfo, { Transparency = 0.8 }):Play()
-        TweenService:Create(btn, tInfo, { Size = UDim2.new(1, 0, 0, CONFIG.buttonHeight) }):Play()
-    end)
+toggleButton.MouseLeave:Connect(function()
+    toggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+end)
 
     btn.MouseButton1Click:Connect(function()
         teleportTo(data.position)
