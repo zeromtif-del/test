@@ -455,11 +455,15 @@ local function createTeleportButton(data, parentScroll, order, allowDelete, inde
     local tInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 toggleButton.MouseEnter:Connect(function()
-    toggleButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+    TweenService:Create(toggleButton, TweenInfo.new(0.15), {
+        Size = UDim2.fromOffset(70, 70),
+    }):Play()
 end)
 
 toggleButton.MouseLeave:Connect(function()
-    toggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    TweenService:Create(toggleButton, TweenInfo.new(0.15), {
+        Size = UDim2.fromOffset(60, 60),
+    }):Play()
 end)
 
     btn.MouseButton1Click:Connect(function()
