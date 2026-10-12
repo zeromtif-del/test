@@ -425,32 +425,6 @@ local function createTeleportButton(data, parentScroll, order, allowDelete, inde
     label.TextTruncate = Enum.TextTruncate.AtEnd
     label.Parent = btn
 
-    -- Координаты
-    local coords = Instance.new("TextLabel")
-    coords.Size = UDim2.fromOffset(90, 30)
-    coords.Position = UDim2.new(1, allowDelete and -160 or -110, 0.5, -15)
-    coords.BackgroundTransparency = 1
-    coords.Text = string.format("%d, %d, %d",
-        math.floor(data.position.X),
-        math.floor(data.position.Y),
-        math.floor(data.position.Z))
-    coords.TextColor3 = Color3.fromRGB(150, 155, 180)
-    coords.TextSize = 11
-    coords.Font = Enum.Font.Gotham
-    coords.TextXAlignment = Enum.TextXAlignment.Right
-    coords.Parent = btn
-
-    -- Стрелка
-    local arrow = Instance.new("TextLabel")
-    arrow.Size = UDim2.fromOffset(28, 30)
-    arrow.Position = UDim2.new(1, allowDelete and -46 or -34, 0.5, -15)
-    arrow.BackgroundTransparency = 1
-    arrow.Text = "➤"
-    arrow.TextColor3 = CONFIG.accentColor
-    arrow.TextSize = 16
-    arrow.Font = Enum.Font.GothamBold
-    arrow.Parent = btn
-
     -- Кнопка удаления (только для пользовательских)
     if allowDelete then
         local del = Instance.new("TextButton")
