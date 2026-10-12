@@ -22,7 +22,7 @@ local CONFIG = {
     accentColor2  = Color3.fromRGB(180, 88, 255),
     bgColor       = Color3.fromRGB(20, 22, 30),
     textColor     = Color3.fromRGB(240, 240, 250),
-    openKey       = Enum.KeyCode.T,
+    openKey       = Enum.KeyCode.F1,
     menuSize      = UDim2.fromOffset(460, 580),
     buttonHeight  = 46,
     buttonSpacing = 8,
@@ -821,3 +821,52 @@ UserInputService.InputBegan:Connect(function(input, processed)
 end)
 
 print("[TeleportMenu] Загружено. T — открыть/закрыть меню.")
+
+--==============================================================
+--  🖱️ ПЕРЕТАСКИВАНИЕ МЕНЮ И КНОПКИ-ОТКРЫВАШКИ
+--  Вставь этот блок В КОНЕЦ существующего LocalScript
+--==============================================================
+
+local function makeDraggable(frame, dragHandle)
+    -- dragHandle = за какую часть тащить (если nil — за саму frame)
+    dragHandle = dragHandle or frame
+
+    local dragging = false
+    local dragStart, startPos
+
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
+
+-- Делаем меню перетаскиваемым за заголовок
+makeDraggable(mainFrame, title)
+
+-- Делаем кнопку-открывашку перетаскиваемой
+makeDraggable(toggleButton)
+
+print("[TeleportMenu] Drag & Drop включён: меню — за заголовок, кнопка — за саму себя.")
