@@ -72,32 +72,27 @@ screenGui.Parent = playerGui
 -- Кнопка-открывашка
 ---------------------------------------------------------------
 --==============================================================
---  КНОПКА-ОТКРЫВАШКА (в виде картинки)
+--  КНОПКА-ОТКРЫВАШКА (простая текстовая)
 --==============================================================
-local BUTTON_IMAGE = "rbxassetid://15983996673"
-local BUTTON_SIZE  = 70                                -- 👈 размер в пикселях
-
-local toggleButton = Instance.new("ImageButton")
+local toggleButton = Instance.new("TextButton")
 toggleButton.Name = "ToggleButton"
-toggleButton.Size = UDim2.fromOffset(BUTTON_SIZE, BUTTON_SIZE)
-toggleButton.Position = UDim2.new(1, -BUTTON_SIZE - 30, 0.5, -BUTTON_SIZE / 2)  -- 👈 позиция
-toggleButton.BackgroundTransparency = 1
-toggleButton.Image = BUTTON_IMAGE
-toggleButton.ImageTransparency = 0
-toggleButton.ScaleType = Enum.ScaleType.Fit
+toggleButton.Size = UDim2.fromOffset(90, 34)
+toggleButton.Position = UDim2.new(0, 30, 0.5, -17)   -- центр сверху
+toggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+toggleButton.Text = "MENU"
+toggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleButton.TextSize = 14
+toggleButton.Font = Enum.Font.Code
 toggleButton.AutoButtonColor = false
 toggleButton.Parent = screenGui
 
--- Скругление (если картинка квадратная и хочется круглые края — убери, если не надо)
 local toggleCorner = Instance.new("UICorner")
-toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.CornerRadius = UDim.new(0, 4)
 toggleCorner.Parent = toggleButton
 
--- Мягкое свечение вокруг кнопки
 local toggleStroke = Instance.new("UIStroke")
-toggleStroke.Color = CONFIG.accentColor
-toggleStroke.Thickness = 2
-toggleStroke.Transparency = 0.5
+toggleStroke.Color = Color3.fromRGB(90, 90, 90)
+toggleStroke.Thickness = 1
 toggleStroke.Parent = toggleButton
 
 ---------------------------------------------------------------
