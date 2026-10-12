@@ -890,12 +890,12 @@ local PETS = {
     ["Tribal Overlord"]     = { repSpeed = 0,  strength = 0,  durability = 0,  rebirth = 2 },
     ["Inferno Unicorn"]     = { repSpeed = 0,  strength = 25, durability = 25, rebirth = 0 },
     ["Inferno Drake"]       = { repSpeed = 40, strength = 0,  durability = 0,  rebirth = 0 },
-    ["Common Boss Pet"]     = { repSpeed = 5,  strength = 0,  durability = 0,  rebirth = 0 },
-    ["Rare Boss Pet"]       = { repSpeed = 10, strength = 0,  durability = 0,  rebirth = 0 },
-    ["Epic Boss Pet"]       = { repSpeed = 0,  strength = 5,  durability = 0,  rebirth = 0 },
-    ["Rainbow Boss Pet"]    = { repSpeed = 0,  strength = 7,  durability = 0,  rebirth = 0 },
-    ["Legendary Boss Pet"]  = { repSpeed = 0,  strength = 10, durability = 0,  rebirth = 0 },
-    ["Mythic Boss Pet"]     = { repSpeed = 0,  strength = 20, durability = 0,  rebirth = 0 },
+    ["Common Boss Pet"]     = { repSpeed = 3,  strength = 0,  durability = 0,  rebirth = 0 },
+    ["Rare Boss Pet"]       = { repSpeed = 7, strength = 0,  durability = 0,  rebirth = 0 },
+    ["Epic Boss Pet"]       = { repSpeed = 10,  strength = 5,  durability = 0,  rebirth = 0 },
+    ["Rainbow Boss Pet"]    = { repSpeed = 10,  strength = 7,  durability = 0,  rebirth = 0 },
+    ["Legendary Boss Pet"]  = { repSpeed = 10,  strength = 10, durability = 0,  rebirth = 0 },
+    ["Mythic Boss Pet"]     = { repSpeed = 10,  strength = 20, durability = 0,  rebirth = 0 },
     -- ⬆️ Добавляй своих петов сюда
 }
 
