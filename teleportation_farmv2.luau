@@ -1295,7 +1295,8 @@ local function startRebirthWorker()
     rebirthState.workerActive = true
     task.spawn(function()
         while rebirthState.running do
-            equipBestFarmingPets()
+            -- 🔕 Петы теперь НЕ экипируются автоматически.
+            -- Если хочешь — жми кнопку «⚡ Экипировать лучших на Rep» вручную.
             doOneRebirth()
             task.wait(0.5)
         end
