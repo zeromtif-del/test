@@ -2840,11 +2840,9 @@ print("[TeleportMenu] Drag & Drop включён: меню — за заголо
 --  ⚡ FAST STRENGTH (вставлено в конце, чтобы все хелперы были доступны)
 --==============================================================
 task.defer(function()
-    task.wait(0.1)  -- ждём, пока все хелперы точно объявятся
+    task.wait(0.1)
 
-    makeSectionHeader(scroll3, "⚡ БЫСТРАЯ СИЛА (Industrial Lift)")
-
-    local VIM = game:GetService("VirtualInputManager")
+    makeSectionHeader(scroll3, "⚡ БЫСТРАЯ СИЛА (Industrial Bar Lift)")
 
     local fastStr = {
         running = false,
@@ -2896,25 +2894,37 @@ task.defer(function()
                     fastStr.reenterAt = math.max(fastStr.reenterAt, os.clock() + 0.5)
                 end
 
-if not fastStr.activeMachine and os.clock() >= fastStr.reenterAt then
-    local lift = MachineHelper.findIndustrialLift()
-    if not lift then
-        lift = MachineHelper.findByName("lift")
-    end
-    if lift then
-        local entered = MachineHelper.enter(lift)
-        if entered then
-            task.wait(0.1)
-            local hum = player.Character
-                and player.Character:FindFirstChildOfClass("Humanoid")
-            if hum and hum.SeatPart then
-                fastStr.activeMachine = lift
-                fastStr.lastLoop = os.clock()
-                fastStr.tokens = 0
-            end
-        end
-    end
-end
+                -- 🎯 Ищем ТОЛЬКО Industrial Bar Lift
+                if not fastStr.activeMachine and os.clock() >= fastStr.reenterAt then
+                    local lift = MachineHelper.findIndustrialLift()
+                    if lift then
+                        local entered = MachineHelper.enter(lift)
+                        if entered then
+                            task.wait(0.1)
+                            local hum = player.Character
+                                and player.Character:FindFirstChildOfClass("Humanoid")
+                            if hum and hum.SeatPart then
+                                fastStr.activeMachine = lift
+                                fastStr.lastLoop = os.clock()
+                                fastStr.tokens = 0
+                                fastStrStatus.Text = "Status: Сел на Industrial Bar Lift"
+                                fastStrStatus.TextColor3 = Color3.fromRGB(80, 255, 120)
+                            else
+                                fastStrStatus.Text = "Status: Не сел, повтор..."
+                                fastStrStatus.TextColor3 = Color3.fromRGB(255, 180, 70)
+                                fastStr.reenterAt = os.clock() + 1
+                            end
+                        else
+                            fastStrStatus.Text = "Status: enter() не сработал"
+                            fastStrStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+                            fastStr.reenterAt = os.clock() + 1
+                        end
+                    else
+                        fastStrStatus.Text = "Status: Industrial Bar Lift НЕ найден"
+                        fastStrStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+                        fastStr.reenterAt = os.clock() + 2
+                    end
+                end
 
                 if fastStr.activeMachine then
                     local now = os.clock()
@@ -2969,7 +2979,7 @@ end
         end
     end)
 
-    makeToggleRow(scroll3, "Fast Strength (Industrial Lift)", false, function(on)
+    makeToggleRow(scroll3, "Fast Strength (Industrial Bar Lift)", false, function(on)
         if on and not farm.ready then
             fastStrStatus.Text = "Status: Игра не загружена"
             fastStrStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
@@ -2981,7 +2991,7 @@ end
             fastStr.sendRate = 1200
             fastStr.tokens = 0
             fastStr.reenterAt = 0
-            fastStrStatus.Text = "Status: Ищу Industrial Lift..."
+            fastStrStatus.Text = "Status: Ищу Industrial Bar Lift..."
             fastStrStatus.TextColor3 = Color3.fromRGB(180, 88, 255)
             startFastStrengthWorker()
         end
