@@ -1259,6 +1259,33 @@ local function isProtected(p)
     return typeof(t) == "number" and Workspace:GetServerTimeNow() < t
 end
 
+---------------------------------------------------------------
+-- Whitelist
+---------------------------------------------------------------
+local whitelisted = {}
+
+local function isWhitelisted(p)
+    if not p then return false end
+    for _, name in ipairs(whitelisted) do
+        if name:lower() == p.Name:lower() then return true end
+    end
+    return false
+end
+
+local function addToWhitelist(p)
+    if not p then return end
+    if isWhitelisted(p) then return end
+    table.insert(whitelisted, p.Name)
+end
+
+local function removeFromWhitelist(name)
+    for i = #whitelisted, 1, -1 do
+        if whitelisted[i]:lower() == name:lower() then
+            table.remove(whitelisted, i)
+        end
+    end
+end
+
 local function getPunchTool()
     local char = player.Character
     if char then
@@ -1411,7 +1438,7 @@ makeToggleRow(scroll5, "Target Kill (по всей карте)", false, function
             while targetKillRunning do
                 local t = targetKillPlayer
                 if t and t.Parent and t.Character then
-                    if isAlive(t) and not isProtected(t) then
+                    if isAlive(t) and not isProtected(t) and not isWhitelisted(t) then
                         hitPlayer(t)
                         task.wait(0.03)
                     else
@@ -1454,14 +1481,14 @@ makeToggleRow(scroll5, "Kill Aura (в радиусе)", false, function(on)
             local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
             if not myHRP then task.wait(0.2); continue end
             local inRange = {}
-            for _, other in ipairs(Players:GetPlayers()) do
-                if other ~= player and isAlive(other) and not isProtected(other) then
-                    local oHRP = other.Character.HumanoidRootPart
-                    if (myHRP.Position - oHRP.Position).Magnitude <= killAuraRange then
-                        table.insert(inRange, other)
-                    end
-                end
-            end
+for _, other in ipairs(Players:GetPlayers()) do
+    if other ~= player and isAlive(other) and not isProtected(other) and not isWhitelisted(other) then
+        local oHRP = other.Character.HumanoidRootPart
+        if (myHRP.Position - oHRP.Position).Magnitude <= killAuraRange then
+            table.insert(inRange, other)
+        end
+    end
+end
             if #inRange == 0 then task.wait(0.3); continue end
             local target = inRange[((killAuraPlayerIndex - 1) % #inRange) + 1]
             killAuraPlayerIndex = killAuraPlayerIndex + 1
@@ -2694,4 +2721,271 @@ task.defer(function()
     end)
 
     print("[Halloween] Вкладка загружена. Впиши имена боссов в HALLOWEEN_BOSSES.")
+end)
+
+--==============================================================
+--  🛡️ WHITELIST UI — добавляем в PvP вкладку
+--==============================================================
+task.defer(function()
+    task.wait(0.4)
+
+    -------------------------------------------------------------
+    -- Проверка: мы уже создали whitelist в PvP?
+    -- Если нет — создаём
+    -------------------------------------------------------------
+    if not whitelisted then
+        warn("[Whitelist] whitelisted не найдена в PvP — создай её патчем 1")
+        return
+    end
+
+    makeSectionHeader(scroll5, "🛡️ Whitelist")
+
+    local wlStatus = makeInfoLabel(scroll5, "Whitelist: пусто", CONFIG.textDim)
+
+    -------------------------------------------------------------
+    -- Кнопка разворота списка игроков (добавление)
+    -------------------------------------------------------------
+    local addExpandBtn = makeActionRow(scroll5, "➕ Добавить в whitelist", Color3.fromRGB(50, 120, 80), function() end)
+
+    local addListFrame = Instance.new("Frame")
+    addListFrame.Size = UDim2.new(1, 0, 0, 0)
+    addListFrame.BackgroundColor3 = CONFIG.panelColor
+    addListFrame.BorderSizePixel = 0
+    addListFrame.ClipsDescendants = true
+    addListFrame.Visible = false
+    addListFrame.Parent = scroll5
+    Instance.new("UICorner", addListFrame).CornerRadius = UDim.new(0, 8)
+
+    local addLayout = Instance.new("UIListLayout")
+    addLayout.Padding = UDim.new(0, 4)
+    addLayout.Parent = addListFrame
+
+    local addPad = Instance.new("UIPadding")
+    addPad.PaddingLeft = UDim.new(0, 6)
+    addPad.PaddingRight = UDim.new(0, 6)
+    addPad.PaddingTop = UDim.new(0, 6)
+    addPad.PaddingBottom = UDim.new(0, 6)
+    addPad.Parent = addListFrame
+
+    local addExpanded = false
+
+    local function rebuildAddList()
+        for _, c in ipairs(addListFrame:GetChildren()) do
+            if c:IsA("TextButton") or c:IsA("TextLabel") then
+                c:Destroy()
+            end
+        end
+
+        local count = 0
+        for _, other in ipairs(Players:GetPlayers()) do
+            if other ~= player then
+                count = count + 1
+                local isIn = isWhitelisted(other)
+
+                local b = Instance.new("TextButton")
+                b.Size = UDim2.new(1, 0, 0, 30)
+                b.BackgroundColor3 = isIn and Color3.fromRGB(50, 120, 80) or CONFIG.cardColor
+                b.Text = (isIn and "✓ " or "  ") .. ("%s (@%s)"):format(other.DisplayName, other.Name)
+                b.TextColor3 = CONFIG.textColor
+                b.TextSize = 12
+                b.Font = Enum.Font.GothamMedium
+                b.AutoButtonColor = false
+                b.Parent = addListFrame
+                Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+
+                b.MouseEnter:Connect(function()
+                    if not isWhitelisted(other) then
+                        b.BackgroundColor3 = CONFIG.cardHover
+                    end
+                end)
+                b.MouseLeave:Connect(function()
+                    b.BackgroundColor3 = isWhitelisted(other)
+                        and Color3.fromRGB(50, 120, 80) or CONFIG.cardColor
+                end)
+                b.MouseButton1Click:Connect(function()
+                    if isWhitelisted(other) then
+                        removeFromWhitelist(other.Name)
+                    else
+                        addToWhitelist(other)
+                    end
+                    -- Пересобираем и добавленный, и удаляемый списки
+                    if _G.__RebuildWlUI then _G.__RebuildWlUI() end
+                end)
+            end
+        end
+
+        if count == 0 then
+            local empty = Instance.new("TextLabel")
+            empty.Size = UDim2.new(1, 0, 0, 30)
+            empty.BackgroundTransparency = 1
+            empty.Text = "На сервере нет других игроков"
+            empty.TextColor3 = CONFIG.textDim
+            empty.TextSize = 12
+            empty.Font = Enum.Font.Gotham
+            empty.Parent = addListFrame
+        end
+    end
+
+    addExpandBtn.MouseButton1Click:Connect(function()
+        addExpanded = not addExpanded
+        if addExpanded then
+            rebuildAddList()
+            local count = 0
+            for _, c in ipairs(addListFrame:GetChildren()) do
+                if c:IsA("TextButton") or c:IsA("TextLabel") then
+                    count = count + 1
+                end
+            end
+            addListFrame.Size = UDim2.new(1, 0, 0, math.max(36, count * 34 + 12))
+            addListFrame.Visible = true
+            addExpandBtn.Text = "➕ Свернуть список"
+        else
+            addListFrame.Visible = false
+            addExpandBtn.Text = "➕ Добавить в whitelist"
+        end
+    end)
+
+    -------------------------------------------------------------
+    -- Кнопка разворота списка whitelist (удаление)
+    -------------------------------------------------------------
+    local removeExpandBtn = makeActionRow(scroll5, "📜 Показать whitelist", Color3.fromRGB(90, 45, 55), function() end)
+
+    local wlListFrame = Instance.new("Frame")
+    wlListFrame.Size = UDim2.new(1, 0, 0, 0)
+    wlListFrame.BackgroundColor3 = CONFIG.panelColor
+    wlListFrame.BorderSizePixel = 0
+    wlListFrame.ClipsDescendants = true
+    wlListFrame.Visible = false
+    wlListFrame.Parent = scroll5
+    Instance.new("UICorner", wlListFrame).CornerRadius = UDim.new(0, 8)
+
+    local wlLayout = Instance.new("UIListLayout")
+    wlLayout.Padding = UDim.new(0, 4)
+    wlLayout.Parent = wlListFrame
+
+    local wlPad = Instance.new("UIPadding")
+    wlPad.PaddingLeft = UDim.new(0, 6)
+    wlPad.PaddingRight = UDim.new(0, 6)
+    wlPad.PaddingTop = UDim.new(0, 6)
+    wlPad.PaddingBottom = UDim.new(0, 6)
+    wlPad.Parent = wlListFrame
+
+    local wlExpanded = false
+
+    local function rebuildWlList()
+        for _, c in ipairs(wlListFrame:GetChildren()) do
+            if c:IsA("TextButton") or c:IsA("TextLabel") then
+                c:Destroy()
+            end
+        end
+
+        if #whitelisted == 0 then
+            local empty = Instance.new("TextLabel")
+            empty.Size = UDim2.new(1, 0, 0, 30)
+            empty.BackgroundTransparency = 1
+            empty.Text = "Whitelist пуст"
+            empty.TextColor3 = CONFIG.textDim
+            empty.TextSize = 12
+            empty.Font = Enum.Font.Gotham
+            empty.Parent = wlListFrame
+            return
+        end
+
+        for _, name in ipairs(whitelisted) do
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(1, 0, 0, 30)
+            b.BackgroundColor3 = CONFIG.cardColor
+            b.Text = "  " .. name .. "   (нажми чтобы удалить)"
+            b.TextColor3 = CONFIG.textColor
+            b.TextSize = 12
+            b.Font = Enum.Font.GothamMedium
+            b.AutoButtonColor = false
+            b.Parent = wlListFrame
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+
+            b.MouseEnter:Connect(function()
+                b.BackgroundColor3 = Color3.fromRGB(90, 45, 55)
+            end)
+            b.MouseLeave:Connect(function()
+                b.BackgroundColor3 = CONFIG.cardColor
+            end)
+            b.MouseButton1Click:Connect(function()
+                removeFromWhitelist(name)
+                if _G.__RebuildWlUI then _G.__RebuildWlUI() end
+            end)
+        end
+    end
+
+    removeExpandBtn.MouseButton1Click:Connect(function()
+        wlExpanded = not wlExpanded
+        if wlExpanded then
+            rebuildWlList()
+            local count = 0
+            for _, c in ipairs(wlListFrame:GetChildren()) do
+                if c:IsA("TextButton") or c:IsA("TextLabel") then
+                    count = count + 1
+                end
+            end
+            wlListFrame.Size = UDim2.new(1, 0, 0, math.max(36, count * 34 + 12))
+            wlListFrame.Visible = true
+            removeExpandBtn.Text = "📜 Скрыть whitelist"
+        else
+            wlListFrame.Visible = false
+            removeExpandBtn.Text = "📜 Показать whitelist"
+        end
+    end)
+
+    -------------------------------------------------------------
+    -- Очистить всё
+    -------------------------------------------------------------
+    makeActionRow(scroll5, "🗑 Очистить whitelist", Color3.fromRGB(120, 50, 60), function()
+        whitelisted = {}
+        if _G.__RebuildWlUI then _G.__RebuildWlUI() end
+    end)
+
+    -------------------------------------------------------------
+    -- Общая функция пересборки обоих списков
+    -------------------------------------------------------------
+    _G.__RebuildWlUI = function()
+        -- Обновляем статус
+        if #whitelisted == 0 then
+            wlStatus.Text = "Whitelist: пусто"
+            wlStatus.TextColor3 = CONFIG.textDim
+        else
+            wlStatus.Text = ("Whitelist (%d): %s"):format(#whitelisted, table.concat(whitelisted, ", "))
+            wlStatus.TextColor3 = CONFIG.green
+        end
+
+        if addExpanded then
+            rebuildAddList()
+            local count = 0
+            for _, c in ipairs(addListFrame:GetChildren()) do
+                if c:IsA("TextButton") or c:IsA("TextLabel") then count = count + 1 end
+            end
+            addListFrame.Size = UDim2.new(1, 0, 0, math.max(36, count * 34 + 12))
+        end
+
+        if wlExpanded then
+            rebuildWlList()
+            local count = 0
+            for _, c in ipairs(wlListFrame:GetChildren()) do
+                if c:IsA("TextButton") or c:IsA("TextLabel") then count = count + 1 end
+            end
+            wlListFrame.Size = UDim2.new(1, 0, 0, math.max(36, count * 34 + 12))
+        end
+    end
+
+    -- Первый рендер
+    _G.__RebuildWlUI()
+
+    -- Обновление при заходе/выходе игроков
+    Players.PlayerAdded:Connect(function()
+        if _G.__RebuildWlUI then _G.__RebuildWlUI() end
+    end)
+    Players.PlayerRemoving:Connect(function(p)
+        removeFromWhitelist(p.Name)
+        if _G.__RebuildWlUI then _G.__RebuildWlUI() end
+    end)
+
+    print("[Whitelist] Загружено. Добавление — через ➕ в PvP.")
 end)
