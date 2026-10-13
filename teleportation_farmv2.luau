@@ -2863,60 +2863,6 @@ task.defer(function()
     local fastStrStatus = makeInfoLabel(scroll3, "Status: Ожидание...", Color3.fromRGB(255, 180, 70))
     local fastStrPace = makeInfoLabel(scroll3, "Pace: --/s", Color3.fromRGB(150, 155, 180))
 
-    local function findIndustrialLift()
-        local mf = workspace:FindFirstChild("machinesFolder")
-        if not mf then return nil end
-        for _, m in ipairs(mf:GetChildren()) do
-            local ln = m.Name:lower()
-            if string.find(ln, "industrial", 1, true) and string.find(ln, "lift", 1, true) then
-                return m
-            end
-        end
-        for _, m in ipairs(mf:GetChildren()) do
-            if string.find(m.Name:lower(), "lift", 1, true)
-                and not string.find(m.Name:lower(), "deadlift", 1, true) then
-                return m
-            end
-        end
-        return nil
-    end
-
-    local function getInteractSeat(machine)
-        for _, d in ipairs(machine:GetDescendants()) do
-            if d:IsA("BasePart") and d.Name:lower() == "interactseat" then
-                return d
-            end
-        end
-    end
-
-    local function enterLift(machine)
-        if not machine or not machine.Parent then return false, nil end
-        local char = player.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        local seat = getInteractSeat(machine)
-        if not hrp or not seat or not hum then return false, nil end
-
-        hrp.CFrame = seat.CFrame * CFrame.new(0, 3, 0)
-        hrp.AssemblyLinearVelocity = Vector3.zero
-        hrp.AssemblyAngularVelocity = Vector3.zero
-        task.wait(0.15)
-        VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        task.wait(0.05)
-        VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        task.wait(0.15)
-
-        task.wait(0.1)
-        local seated = hum.SeatPart
-        if seated and seated:IsDescendantOf(machine) then
-            return true, seated
-        end
-        if hum.Sit then
-            return true, seat
-        end
-        return false, nil
-    end
-
     local function startFastStrengthWorker()
         task.spawn(function()
             fastStr.lastLoop = os.clock()
@@ -2950,18 +2896,25 @@ task.defer(function()
                     fastStr.reenterAt = math.max(fastStr.reenterAt, os.clock() + 0.5)
                 end
 
-                if not fastStr.activeMachine and os.clock() >= fastStr.reenterAt then
-                    local lift = findIndustrialLift()
-                    if lift then
-                        local ok, seat = enterLift(lift)
-                        if ok then
-                            fastStr.activeMachine = lift
-                            fastStr.seatPart = seat
-                            fastStr.lastLoop = os.clock()
-                            fastStr.tokens = 0
-                        end
-                    end
-                end
+if not fastStr.activeMachine and os.clock() >= fastStr.reenterAt then
+    local lift = MachineHelper.findIndustrialLift()
+    if not lift then
+        lift = MachineHelper.findByName("lift")
+    end
+    if lift then
+        local entered = MachineHelper.enter(lift)
+        if entered then
+            task.wait(0.1)
+            local hum = player.Character
+                and player.Character:FindFirstChildOfClass("Humanoid")
+            if hum and hum.SeatPart then
+                fastStr.activeMachine = lift
+                fastStr.lastLoop = os.clock()
+                fastStr.tokens = 0
+            end
+        end
+    end
+end
 
                 if fastStr.activeMachine then
                     local now = os.clock()
