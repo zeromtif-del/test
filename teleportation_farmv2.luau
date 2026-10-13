@@ -1222,6 +1222,16 @@ local repState = {
     startStrength = 0,
 }
 
+--==============================================================
+--  🌾 ПОЛЕ СКОРОСТИ Fast Rep (без лимита)
+--==============================================================
+makeInputRow(scroll3, "Fast Rep: reps/s", "659", function(v)
+    if v and v > 0 then
+        repState.maxRate = math.floor(v)   -- 🔥 БЕЗ ЛИМИТА
+        repState.sendRate = math.min(repState.sendRate, repState.maxRate)
+    end
+end)
+
 local repWorker = nil
 local function startRepWorker()
     if repWorker then return end
@@ -1261,8 +1271,8 @@ local function startRepWorker()
             end
 
             -- Отправка
-            repState.tokens = math.min(24, repState.tokens + repState.sendRate * dt)
-            local burst = math.max(1, math.min(24, math.ceil(repState.sendRate * 0.05)))
+            repState.tokens = math.min(512, repState.tokens + repState.sendRate * dt)
+            local burst = math.max(1, math.min(512, math.ceil(repState.sendRate * 0.06)))
             local count = math.min(math.floor(repState.tokens), burst)
             for _ = 1, count do
                 farm.muscleEvent:FireServer("rep")
@@ -1672,7 +1682,7 @@ local function makeInputRow(parent, labelText, defaultText, callback)
     box.Position = UDim2.new(0.5, 5, 0.5, -14)
     box.BackgroundColor3 = Color3.fromRGB(28, 32, 44)
     box.Text = tostring(defaultText or "")
-    box.PlaceholderText = "Введи + Enter"
+    box.PlaceholderText = "Введи число"
     box.TextColor3 = CONFIG.textColor
     box.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
     box.TextSize = 14
@@ -1680,6 +1690,21 @@ local function makeInputRow(parent, labelText, defaultText, callback)
     box.ClearTextOnFocus = false
     box.Parent = row
     Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+
+    -- 🔒 Фильтр: только цифры 0-9 (буквы, символы, эмодзи — блокируются)
+    local updating = false
+    box:GetPropertyChangedSignal("Text"):Connect(function()
+        if updating then return end
+        updating = true
+        local cleaned = box.Text:gsub("%D", "")   -- %D = всё, что не цифра
+        if cleaned ~= box.Text then
+            local cursor = box.CursorPosition
+            box.Text = cleaned
+            local newCursor = math.min(cursor - (#box.Text - #cleaned), #cleaned + 1)
+            box.CursorPosition = math.max(1, newCursor)
+        end
+        updating = false
+    end)
 
     box.FocusLost:Connect(function(enterPressed)
         if enterPressed then
@@ -2835,317 +2860,3 @@ end)
 print("[TeleportMenu] Готово. 8 вкладок, T — открыть меню.")
 
 print("[TeleportMenu] Drag & Drop включён: меню — за заголовок, кнопка — за саму себя.")
-
---==============================================================
---  ⚡ FAST STRENGTH — работает на любой штанге, куда сядет игрок
---==============================================================
-task.defer(function()
-    task.wait(0.1)
-
-    makeSectionHeader(scroll3, "⚡ БЫСТРАЯ СИЛА")
-
-    local fastStr = {
-        running = false,
-        activeMachine = nil,
-        reenterAt = 0,
-        maxRate = 1800,
-        sendRate = 1200,
-        tokens = 0,
-        lastLoop = os.clock(),
-        lastControlAt = tick(),
-        lastStrength = 0,
-        stalledIntervals = 0,
-        autoSeat = true,   -- авто-поиск штанги если не сидишь
-    }
-
-    local fastStrStatus = makeInfoLabel(scroll3, "Status: Ожидание...", Color3.fromRGB(255, 180, 70))
-    local fastStrPace = makeInfoLabel(scroll3, "Pace: --/s", Color3.fromRGB(150, 155, 180))
-    local fastStrMachine = makeInfoLabel(scroll3, "Штанга: —", Color3.fromRGB(150, 155, 180))
-
-    -------------------------------------------------------------
-    -- Проверка: сидим ли на штанге?
-    -- Возвращает machine-модель ИЛИ nil
-    -------------------------------------------------------------
-    local function getSeatedMachine()
-        local char = player.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if not hum then return nil end
-        local seat = hum.SeatPart
-        if not seat then return nil end
-
-        -- Ищем родителя, который выглядит как тренажёр
-        local mf = workspace:FindFirstChild("machinesFolder")
-        if mf then
-            local cur = seat
-            while cur and cur ~= workspace do
-                if cur.Parent == mf then
-                    return cur
-                end
-                cur = cur.Parent
-            end
-        end
-
-        -- Если не в machinesFolder — вернём верхний Model
-        local cur = seat
-        while cur and cur.Parent and cur.Parent ~= workspace do
-            cur = cur.Parent
-        end
-        return cur
-    end
-
-    -------------------------------------------------------------
-    -- Найти ЛЮБУЮ штангу (Lift, но не Deadlift / Squat / Bench press bar)
-    -------------------------------------------------------------
-    local function findAnyLift()
-        local mf = workspace:FindFirstChild("machinesFolder")
-        if not mf then return nil end
-
-        -- 1) Приоритет: name содержит "lift" и не содержит "deadlift"
-        for _, m in ipairs(mf:GetChildren()) do
-            local ln = m.Name:lower()
-            if string.find(ln, "lift", 1, true)
-                and not string.find(ln, "deadlift", 1, true) then
-                return m
-            end
-        end
-
-        -- 2) Фолбэк: любой "bar" / "bench" / "press"
-        for _, m in ipairs(mf:GetChildren()) do
-            local ln = m.Name:lower()
-            if (string.find(ln, "bar", 1, true) or string.find(ln, "bench", 1, true) or string.find(ln, "press", 1, true))
-                and not string.find(ln, "deadlift", 1, true) then
-                return m
-            end
-        end
-
-        return nil
-    end
-
-    -------------------------------------------------------------
-    -- Универсальная функция: найти InteractSeat / Seat в модели
-    -------------------------------------------------------------
-    local function getSeatPart(machine)
-        -- 1) Прямой Seat
-        local direct = machine:FindFirstChildWhichIsA("Seat", true)
-        if direct then return direct end
-
-        -- 2) InteractSeat
-        for _, d in ipairs(machine:GetDescendants()) do
-            if d:IsA("BasePart") and string.find(d.Name:lower(), "interactseat", 1, true) then
-                return d
-            end
-        end
-
-        -- 3) Любой Seat внутри модели
-        for _, d in ipairs(machine:GetDescendants()) do
-            if d:IsA("Seat") then return d end
-        end
-
-        return nil
-    end
-
-    -------------------------------------------------------------
-    -- Посадить игрока на штангу
-    -------------------------------------------------------------
-    local function seatOnMachine(machine)
-        if not machine or not machine.Parent then return false end
-        local char = player.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not hum then return false end
-
-        local seat = getSeatPart(machine)
-        if not seat then return false end
-
-        hrp.CFrame = seat.CFrame * CFrame.new(0, 3, 0)
-        hrp.AssemblyLinearVelocity = Vector3.zero
-        hrp.AssemblyAngularVelocity = Vector3.zero
-        task.wait(0.2)
-
-        -- Пробуем посадить через Sit
-        hum.Sit = true
-        task.wait(0.1)
-        -- Если не помогло — через E
-        if not hum.SeatPart then
-            local VIM = game:GetService("VirtualInputManager")
-            VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-            task.wait(0.05)
-            VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-            task.wait(0.3)
-        end
-
-        return hum.SeatPart ~= nil
-    end
-
-    -------------------------------------------------------------
-    -- Воркер
-    -------------------------------------------------------------
-    local function startFastStrengthWorker()
-        task.spawn(function()
-            fastStr.lastLoop = os.clock()
-            fastStr.lastControlAt = tick()
-            fastStr.lastStrength = farm.strength.Value
-            fastStr.tokens = 0
-            fastStr.stalledIntervals = 0
-
-            while fastStr.running do
-                local myChar = player.Character
-                local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-
-                if not myChar or not myHum or myHum.Health <= 0 then
-                    fastStr.activeMachine = nil
-                    fastStr.reenterAt = math.max(fastStr.reenterAt, os.clock() + 2)
-                    task.wait(0.2)
-                    continue
-                end
-
-                -- Проверяем, сидим ли где-то прямо сейчас
-                local seatedMachine = getSeatedMachine()
-
-                if seatedMachine then
-                    -- Сидим — обновляем activeMachine
-                    if fastStr.activeMachine ~= seatedMachine then
-                        fastStr.activeMachine = seatedMachine
-                        fastStr.lastLoop = os.clock()
-                        fastStr.tokens = 0
-                        fastStrMachine.Text = "Штанга: " .. seatedMachine.Name
-                        fastStrStatus.Text = "Status: Фарм (сел на " .. seatedMachine.Name .. ")"
-                        fastStrStatus.TextColor3 = Color3.fromRGB(80, 255, 120)
-                    end
-                else
-                    -- Не сидим — сбрасываем и пытаемся сесть
-                    fastStr.activeMachine = nil
-
-                    if fastStr.autoSeat and os.clock() >= fastStr.reenterAt then
-                        local target = findAnyLift()
-                        if target then
-                            fastStrStatus.Text = "Status: Сажусь на " .. target.Name .. "..."
-                            fastStrStatus.TextColor3 = Color3.fromRGB(180, 88, 255)
-                            fastStrMachine.Text = "Штанга: " .. target.Name
-
-                            local ok = seatOnMachine(target)
-                            if ok then
-                                fastStr.activeMachine = target
-                                fastStr.lastLoop = os.clock()
-                                fastStr.tokens = 0
-                            else
-                                fastStrStatus.Text = "Status: Не сел, повтор..."
-                                fastStrStatus.TextColor3 = Color3.fromRGB(255, 180, 70)
-                                fastStr.reenterAt = os.clock() + 1.5
-                            end
-                        else
-                            fastStrStatus.Text = "Status: Штанга не найдена"
-                            fastStrStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-                            fastStr.reenterAt = os.clock() + 2
-                        end
-                    end
-                end
-
-                -- Спамим reps, если на штанге
-                if fastStr.activeMachine then
-                    local now = os.clock()
-                    local dt = math.min(0.1, now - fastStr.lastLoop)
-                    fastStr.lastLoop = now
-
-                    -- Адаптивный контроль
-                    if tick() - fastStr.lastControlAt >= 0.5 then
-                        local progressed = farm.strength.Value > fastStr.lastStrength
-                        if progressed then
-                            fastStr.stalledIntervals = 0
-                            fastStr.sendRate = math.min(fastStr.maxRate, fastStr.sendRate * 1.15)
-                            fastStrStatus.Text = ("Status: Фарм | %.0f reps/s"):format(fastStr.sendRate)
-                            fastStrStatus.TextColor3 = Color3.fromRGB(80, 255, 120)
-                        else
-                            fastStr.stalledIntervals = fastStr.stalledIntervals + 1
-                        end
-                        if fastStr.stalledIntervals >= 3 then
-                            fastStr.sendRate = math.max(400, fastStr.sendRate * 0.7)
-                            fastStr.tokens = 0
-                            fastStr.stalledIntervals = 0
-                            fastStrStatus.Text = ("Status: Замедляюсь | %.0f reps/s"):format(fastStr.sendRate)
-                            fastStrStatus.TextColor3 = Color3.fromRGB(255, 180, 70)
-                        end
-                        fastStr.lastControlAt = tick()
-                        fastStr.lastStrength = farm.strength.Value
-                    end
-
-                    fastStr.tokens = math.min(64, fastStr.tokens + fastStr.sendRate * dt)
-                    local burst = math.max(1, math.min(64, math.ceil(fastStr.sendRate * 0.06)))
-                    local count = math.min(math.floor(fastStr.tokens), burst)
-
-                    for _ = 1, count do
-                        pcall(function()
-                            farm.muscleEvent:FireServer("rep")
-                        end)
-                    end
-                    fastStr.tokens = fastStr.tokens - count
-                end
-
-                RS.Heartbeat:Wait()
-            end
-
-            fastStrStatus.Text = "Status: Остановлено"
-            fastStrStatus.TextColor3 = Color3.fromRGB(255, 180, 70)
-            fastStrMachine.Text = "Штанга: —"
-        end)
-    end
-
-    -------------------------------------------------------------
-    -- UI
-    -------------------------------------------------------------
-    makeInputRow(scroll3, "Max reps/s", "1800", function(v)
-        if v and v > 0 then
-            fastStr.maxRate = math.clamp(v, 400, 5000)
-            fastStr.sendRate = math.min(fastStr.sendRate, fastStr.maxRate)
-        end
-    end)
-
-    makeToggleRow(scroll3, "Auto-Seat (искать штангу самому)", true, function(on)
-        fastStr.autoSeat = on
-    end):Set(true)
-
-    makeToggleRow(scroll3, "Fast Strength", false, function(on)
-        if on and not farm.ready then
-            fastStrStatus.Text = "Status: Игра не загружена"
-            fastStrStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-            return
-        end
-
-        fastStr.running = on
-        if on then
-            fastStr.sendRate = 1200
-            fastStr.tokens = 0
-            fastStr.reenterAt = 0
-            fastStrStatus.Text = "Status: Проверяю, сижу ли на штанге..."
-            fastStrStatus.TextColor3 = Color3.fromRGB(180, 88, 255)
-            startFastStrengthWorker()
-        end
-    end)
-
-    -------------------------------------------------------------
-    -- Pace
-    -------------------------------------------------------------
-    task.spawn(function()
-        local sampleAt = tick()
-        local sampleStr = 0
-        while true do
-            if fastStr.running and farm.ready then
-                local now = tick()
-                if now - sampleAt >= 1 then
-                    local d = farm.strength.Value - sampleStr
-                    fastStrPace.Text = ("Pace: %s/s"):format(
-                        d >= 1e6 and string.format("%.1fM", d / 1e6)
-                        or d >= 1e3 and string.format("%.1fK", d / 1e3)
-                        or tostring(math.floor(d))
-                    )
-                    sampleAt = now
-                    sampleStr = farm.strength.Value
-                end
-            else
-                sampleAt = tick()
-                sampleStr = farm.strength.Value
-            end
-            task.wait(0.2)
-        end
-    end)
-end)
