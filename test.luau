@@ -171,14 +171,48 @@ toggleStroke.Parent = toggleButton
 -- Главное окно
 ---------------------------------------------------------------
 local mainFrame = Instance.new("Frame")
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)         -- 🔥 центрируем точкой, а не offset
+mainFrame.Position = UDim2.fromScale(0.5, 0.5)         -- 🔥 всегда по центру
 mainFrame.Size = CONFIG.menuSize
-mainFrame.Position = UDim2.new(0.5, -CONFIG.menuSize.X.Offset / 2,
-                               0.5, -CONFIG.menuSize.Y.Offset / 2)
 mainFrame.BackgroundColor3 = CONFIG.bgColor
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
 mainFrame.Visible = false
 mainFrame.Parent = screenGui
+
+--==============================================================
+--  📱 АВТО-МАСШТАБ (телефоны, маленькие экраны)
+--==============================================================
+local menuScale = Instance.new("UIScale")
+menuScale.Scale = 1
+menuScale.Parent = mainFrame
+
+local function updateMenuScale()
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local vp = cam.ViewportSize
+
+    local designW = CONFIG.menuSize.X.Offset
+    local designH = CONFIG.menuSize.Y.Offset
+
+    -- Не больше 92% экрана по каждой оси
+    local sx = (vp.X * 0.92) / designW
+    local sy = (vp.Y * 0.92) / designH
+    local scale = math.min(sx, sy, 1)   -- больше 1 не увеличиваем
+
+    -- На тач-устройствах (телефон/планшет) — ещё чуть меньше
+    local isTouch = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+    if isTouch then
+        scale = scale * 0.9
+    end
+
+    menuScale.Scale = scale
+end
+
+if workspace.CurrentCamera then
+    workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateMenuScale)
+end
+updateMenuScale()
 
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 16)
 
@@ -816,17 +850,16 @@ local function openMenu()
     isAnimating = true
     isOpen = true
 
-    mainFrame.Visible = true
-    mainFrame.Size = UDim2.new(0, 0, 0, 0)
-    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.Visible = true
+mainFrame.Size = UDim2.new(0, 0, 0, 0)
+mainFrame.Position = UDim2.fromScale(0.5, 0.5)
 
-    local tween = TweenService:Create(mainFrame,
-        TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {
-            Size = CONFIG.menuSize,
-            Position = UDim2.new(0.5, -CONFIG.menuSize.X.Offset / 2,
-                                 0.5, -CONFIG.menuSize.Y.Offset / 2),
-        })
+local tween = TweenService:Create(mainFrame,
+    TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+    {
+        Size = CONFIG.menuSize,
+        Position = UDim2.fromScale(0.5, 0.5),
+    })
     tween:Play()
     tween.Completed:Wait()
     isAnimating = false
@@ -842,12 +875,12 @@ local function closeMenu()
     isAnimating = true
     isOpen = false
 
-    local tween = TweenService:Create(mainFrame,
-        TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-        {
-            Size = UDim2.new(0, 0, 0, 0),
-            Position = UDim2.new(0.5, 0, 0.5, 0),
-        })
+local tween = TweenService:Create(mainFrame,
+    TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+    {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.fromScale(0.5, 0.5),
+    })
     tween:Play()
     tween.Completed:Wait()
     mainFrame.Visible = false
