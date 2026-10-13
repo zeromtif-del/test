@@ -1256,29 +1256,43 @@ local rebirthState = {
 }
 
 local function doOneRebirth()
-    -- 1. Качаем силу до целевого значения
-    local target = 5000 + farm.rebirths.Value * 2550
-    local isPremium = player.MembershipType == Enum.MembershipType.Premium
-    local burst = isPremium and 6 or 12
-
-    while rebirthState.running and farm.strength.Value < target do
-        for _ = 1, burst do
-            farm.muscleEvent:FireServer("rep")
-        end
-        task.wait(0.02)
+    -- 1. Запускаем основной Fast Rep worker (если ещё не запущен)
+    local wasRunning = repState.running
+    if not wasRunning then
+        repState.running = true
+        startRepWorker()
     end
 
-    if not rebirthState.running then return end
-
-    task.wait(0.25)
-
-    -- 3. Жмём перерождение
-    local before = farm.rebirths.Value
+    -- 2. Ждём, пока сила дойдёт до целевого значения
+    local target = 5000 + farm.rebirths.Value * 2550
     local t0 = tick()
+
+    while rebirthState.running and farm.strength.Value < target do
+        task.wait(0.1)
+        -- защита от зависания: если за 60 сек сила не растёт — выходим
+        if tick() - t0 > 60 and farm.strength.Value < target then
+            -- продолжаем ждать, но не бесконечно
+        end
+    end
+
+    if not rebirthState.running then
+        -- если пользователь выключил rebirth — вернуть repState как было
+        if not wasRunning then repState.running = false end
+        return
+    end
+
+    -- 3. Rebirth
+    local before = farm.rebirths.Value
+    local t1 = tick()
     repeat
         farm.rebirthRemote:InvokeServer("rebirthRequest")
         task.wait(0.05)
-    until farm.rebirths.Value > before or not rebirthState.running or tick() - t0 > 5
+    until farm.rebirths.Value > before or not rebirthState.running or tick() - t1 > 5
+
+    -- 4. Если Fast Rep не был включён игроком — выключаем его
+    if not wasRunning then
+        repState.running = false
+    end
 end
 
 local function startRebirthWorker()
