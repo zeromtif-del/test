@@ -888,12 +888,12 @@ local PETS = {
     ["Tribal Overlord"]     = { repSpeed = 0,  strength = 0,  durability = 0,  rebirth = 2 },
     ["Inferno Unicorn"]     = { repSpeed = 0,  strength = 25, durability = 25, rebirth = 0 },
     ["Inferno Drake"]       = { repSpeed = 40, strength = 0,  durability = 0,  rebirth = 0 },
-    ["Common Boss Pet"]     = { repSpeed = 3,  strength = 0,  durability = 0,  rebirth = 0 },
+    ["Common Boss Pet"]     = { repSpeed = 5,  strength = 0,  durability = 0,  rebirth = 0 },
     ["Rare Boss Pet"]       = { repSpeed = 7, strength = 0,  durability = 0,  rebirth = 0 },
-    ["Epic Boss Pet"]       = { repSpeed = 10,  strength = 5,  durability = 0,  rebirth = 0 },
+    ["Epic Boss Pet"]       = { repSpeed = 10,  strength = 0,  durability = 0,  rebirth = 0 },
     ["Rainbow Boss Pet"]    = { repSpeed = 10,  strength = 7,  durability = 0,  rebirth = 0 },
     ["Legendary Boss Pet"]  = { repSpeed = 10,  strength = 10, durability = 0,  rebirth = 0 },
-    ["Mythic Boss Pet"]     = { repSpeed = 10,  strength = 20, durability = 0,  rebirth = 0 },
+    ["Mythic Boss Pet"]     = { repSpeed = 10,  strength = 25, durability = 0,  rebirth = 0 },
     -- ⬆️ Добавляй своих петов сюда
 }
 
@@ -1325,6 +1325,244 @@ makeToggleRow(scroll3, "Fast Rebirth (Auto)", false, function(on)
     else
         statusLabel.Text = "Status: Остановлено"
         statusLabel.TextColor3 = Color3.fromRGB(255, 180, 70)
+    end
+end)
+
+--==============================================================
+--  ⚡ FAST STRENGTH — авто-Industrial Lift + сверхбыстрые репсы
+--==============================================================
+makeSectionHeader(scroll3, "⚡ БЫСТРАЯ СИЛА (Industrial Lift)")
+
+local VIM = game:GetService("VirtualInputManager")
+
+local fastStr = {
+    running = false,
+    activeMachine = nil,
+    seatPart = nil,
+    reenterAt = 0,
+    maxRate = 2000,          -- 🔥 максимум reps/s (регулируй тут)
+    sendRate = 1200,         -- стартовая скорость
+    tokens = 0,
+    lastLoop = os.clock(),
+    lastControlAt = tick(),
+    lastStrength = 0,
+    stalledIntervals = 0,
+}
+
+local fastStrStatus = makeInfoLabel(scroll3, "Status: Ожидание...", Color3.fromRGB(255, 180, 70))
+local fastStrPace = makeInfoLabel(scroll3, "Pace: --/s", Color3.fromRGB(150, 155, 180))
+
+---------------------------------------------------------------
+-- Поиск Industrial Lift
+---------------------------------------------------------------
+local function findIndustrialLift()
+    local mf = workspace:FindFirstChild("machinesFolder")
+    if not mf then return nil end
+    for _, m in ipairs(mf:GetChildren()) do
+        local ln = m.Name:lower()
+        if string.find(ln, "industrial", 1, true) and string.find(ln, "lift", 1, true) then
+            return m
+        end
+    end
+    -- Фолбэк: любой Lift, если Industrial не найден
+    for _, m in ipairs(mf:GetChildren()) do
+        if string.find(m.Name:lower(), "lift", 1, true)
+            and not string.find(m.Name:lower(), "deadlift", 1, true) then
+            return m
+        end
+    end
+    return nil
+end
+
+local function getInteractSeat(machine)
+    for _, d in ipairs(machine:GetDescendants()) do
+        if d:IsA("BasePart") and d.Name:lower() == "interactseat" then
+            return d
+        end
+    end
+end
+
+local function enterLift(machine)
+    if not machine or not machine.Parent then return false, nil end
+    local char = player.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local seat = getInteractSeat(machine)
+    if not hrp or not seat or not hum then return false, nil end
+
+    hrp.CFrame = seat.CFrame * CFrame.new(0, 3, 0)
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+    task.wait(0.15)
+    VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.05)
+    VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    task.wait(0.15)
+
+    -- Проверяем, сел ли
+    task.wait(0.1)
+    local seated = hum.SeatPart
+    if seated and seated:IsDescendantOf(machine) then
+        return true, seated
+    end
+    -- Иногда SeatPart не машины, но сидим на машине
+    if hum.Sit then
+        return true, seat
+    end
+    return false, nil
+end
+
+---------------------------------------------------------------
+-- Основной воркер
+---------------------------------------------------------------
+local function startFastStrengthWorker()
+    task.spawn(function()
+        fastStr.lastLoop = os.clock()
+        fastStr.lastControlAt = tick()
+        fastStr.lastStrength = farm.strength.Value
+        fastStr.tokens = 0
+        fastStr.stalledIntervals = 0
+
+        while fastStr.running do
+            local myChar = player.Character
+            local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+            local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+            -- Респавн / потеря персонажа — ждём
+            if not myChar or not myHum or myHum.Health <= 0 or not myHRP then
+                fastStr.activeMachine = nil
+                fastStr.seatPart = nil
+                fastStr.reenterAt = math.max(fastStr.reenterAt, os.clock() + 2.5)
+                task.wait(0.2)
+                continue
+            end
+
+            -- Проверяем, не выкинуло ли с тренажёра
+            local seated = myHum.SeatPart
+            local stillOnMachine = fastStr.activeMachine
+                and fastStr.activeMachine.Parent
+                and seated
+                and seated:IsDescendantOf(fastStr.activeMachine)
+
+            if not stillOnMachine then
+                fastStr.activeMachine = nil
+                fastStr.seatPart = nil
+                fastStr.reenterAt = math.max(fastStr.reenterAt, os.clock() + 0.5)
+            end
+
+            -- Садимся заново
+            if not fastStr.activeMachine and os.clock() >= fastStr.reenterAt then
+                local lift = findIndustrialLift()
+                if lift then
+                    local ok, seat = enterLift(lift)
+                    if ok then
+                        fastStr.activeMachine = lift
+                        fastStr.seatPart = seat
+                        fastStr.lastLoop = os.clock()
+                        fastStr.tokens = 0
+                    end
+                end
+            end
+
+            -- Если сидим на тренажёре — шлём репсы
+            if fastStr.activeMachine then
+                local now = os.clock()
+                local dt = math.min(0.1, now - fastStr.lastLoop)
+                fastStr.lastLoop = now
+
+                -- Адаптивный контроль скорости
+                if tick() - fastStr.lastControlAt >= 0.5 then
+                    local progressed = farm.strength.Value > fastStr.lastStrength
+                    if progressed then
+                        fastStr.stalledIntervals = 0
+                        fastStr.sendRate = math.min(fastStr.maxRate, fastStr.sendRate * 1.15)
+                        fastStrStatus.Text = ("Status: Фарм | %.0f reps/s"):format(fastStr.sendRate)
+                        fastStrStatus.TextColor3 = Color3.fromRGB(80, 255, 120)
+                    else
+                        fastStr.stalledIntervals = fastStr.stalledIntervals + 1
+                    end
+                    if fastStr.stalledIntervals >= 3 then
+                        fastStr.sendRate = math.max(400, fastStr.sendRate * 0.7)
+                        fastStr.tokens = 0
+                        fastStr.stalledIntervals = 0
+                        fastStrStatus.Text = ("Status: Замедляюсь | %.0f reps/s"):format(fastStr.sendRate)
+                        fastStrStatus.TextColor3 = Color3.fromRGB(255, 180, 70)
+                    end
+                    fastStr.lastControlAt = tick()
+                    fastStr.lastStrength = farm.strength.Value
+                end
+
+                -- Токен-система для бёрстов
+                fastStr.tokens = math.min(64, fastStr.tokens + fastStr.sendRate * dt)
+                local burst = math.max(1, math.min(64, math.ceil(fastStr.sendRate * 0.06)))
+                local count = math.min(math.floor(fastStr.tokens), burst)
+
+                for _ = 1, count do
+                    pcall(function()
+                        farm.muscleEvent:FireServer("rep")
+                    end)
+                end
+                fastStr.tokens = fastStr.tokens - count
+            end
+
+            RS.Heartbeat:Wait()
+        end
+
+        fastStrStatus.Text = "Status: Остановлено"
+        fastStrStatus.TextColor3 = Color3.fromRGB(255, 180, 70)
+    end)
+end
+
+---------------------------------------------------------------
+-- UI
+---------------------------------------------------------------
+makeInputRow(scroll3, "Max reps/s", "1800", function(v)
+    if v and v > 0 then
+        fastStr.maxRate = math.clamp(v, 400, 5000)
+        fastStr.sendRate = math.min(fastStr.sendRate, fastStr.maxRate)
+    end
+end)
+
+makeToggleRow(scroll3, "Fast Strength (Industrial Lift)", false, function(on)
+    if on and not farm.ready then
+        fastStrStatus.Text = "Status: Игра не загружена"
+        fastStrStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
+        return
+    end
+
+    fastStr.running = on
+    if on then
+        fastStr.sendRate = 1200
+        fastStr.tokens = 0
+        fastStr.reenterAt = 0
+        fastStrStatus.Text = "Status: Ищу Industrial Lift..."
+        fastStrStatus.TextColor3 = Color3.fromRGB(180, 88, 255)
+        startFastStrengthWorker()
+    end
+end)
+
+-- Pace-обновление
+task.spawn(function()
+    local sampleAt = tick()
+    local sampleStr = 0
+    while true do
+        if fastStr.running and farm.ready then
+            local now = tick()
+            if now - sampleAt >= 1 then
+                local d = farm.strength.Value - sampleStr
+                fastStrPace.Text = ("Pace: %s/s"):format(
+                    d >= 1e6 and string.format("%.1fM", d / 1e6)
+                    or d >= 1e3 and string.format("%.1fK", d / 1e3)
+                    or tostring(math.floor(d))
+                )
+                sampleAt = now
+                sampleStr = farm.strength.Value
+            end
+        else
+            sampleAt = tick()
+            sampleStr = farm.strength.Value
+        end
+        task.wait(0.2)
     end
 end)
 
