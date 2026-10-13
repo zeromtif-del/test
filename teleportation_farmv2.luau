@@ -1224,6 +1224,59 @@ local repState = {
 
 _G.__repState = repState
 
+local repWorker = nil
+local function startRepWorker()
+    if repWorker then return end
+    repState.lastLoop = os.clock()
+    repState.lastControlAt = tick()
+    repState.lastStrength = farm.strength.Value
+    repState.tokens = 0
+    repState.sessionStart = tick()
+    repState.startStrength = farm.strength.Value
+
+    repWorker = task.spawn(function()
+        while repState.running do
+            local now = os.clock()
+            local dt = math.min(0.1, now - repState.lastLoop)
+            repState.lastLoop = now
+
+            -- Автоконтроль скорости
+            if tick() - repState.lastControlAt >= 0.5 then
+                local progressed = farm.strength.Value > repState.lastStrength
+                if progressed then
+                    repState.stalledIntervals = 0
+                    repState.sendRate = math.min(repState.maxRate, repState.sendRate * 1.12)
+                    statusLabel.Text = ("Status: Фарм | %.0f reps/s"):format(repState.sendRate)
+                    statusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+                else
+                    repState.stalledIntervals = repState.stalledIntervals + 1
+                end
+                if repState.stalledIntervals >= 2 then
+                    repState.sendRate = math.max(200, repState.sendRate * 0.65)
+                    repState.tokens = 0
+                    repState.stalledIntervals = 0
+                    statusLabel.Text = ("Status: Замедляюсь | %.0f reps/s"):format(repState.sendRate)
+                    statusLabel.TextColor3 = Color3.fromRGB(255, 180, 70)
+                end
+                repState.lastControlAt = tick()
+                repState.lastStrength = farm.strength.Value
+            end
+
+            -- Отправка reps
+            repState.tokens = math.min(512, repState.tokens + repState.sendRate * dt)
+            local burst = math.max(1, math.min(512, math.ceil(repState.sendRate * 0.06)))
+            local count = math.min(math.floor(repState.tokens), burst)
+            for _ = 1, count do
+                farm.muscleEvent:FireServer("rep")
+            end
+            repState.tokens = repState.tokens - count
+
+            RS.Heartbeat:Wait()
+        end
+        repWorker = nil
+    end)
+end
+
 local function stopRep()
     repState.running = false
 end
