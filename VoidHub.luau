@@ -10,6 +10,7 @@ local RunService       = game:GetService("RunService")
 local Lighting         = game:GetService("Lighting")
 local Workspace        = workspace
 local VIM              = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player    = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
