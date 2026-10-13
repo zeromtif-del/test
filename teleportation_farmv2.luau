@@ -2837,17 +2837,16 @@ print("[TeleportMenu] Готово. 8 вкладок, T — открыть ме�
 print("[TeleportMenu] Drag & Drop включён: меню — за заголовок, кнопка — за саму себя.")
 
 --==============================================================
---  ⚡ FAST STRENGTH (вставлено в конце, чтобы все хелперы были доступны)
+--  ⚡ FAST STRENGTH — работает на любой штанге, куда сядет игрок
 --==============================================================
 task.defer(function()
     task.wait(0.1)
 
-    makeSectionHeader(scroll3, "⚡ БЫСТРАЯ СИЛА (Industrial Bar Lift)")
+    makeSectionHeader(scroll3, "⚡ БЫСТРАЯ СИЛА")
 
     local fastStr = {
         running = false,
         activeMachine = nil,
-        seatPart = nil,
         reenterAt = 0,
         maxRate = 1800,
         sendRate = 1200,
@@ -2856,11 +2855,131 @@ task.defer(function()
         lastControlAt = tick(),
         lastStrength = 0,
         stalledIntervals = 0,
+        autoSeat = true,   -- авто-поиск штанги если не сидишь
     }
 
     local fastStrStatus = makeInfoLabel(scroll3, "Status: Ожидание...", Color3.fromRGB(255, 180, 70))
     local fastStrPace = makeInfoLabel(scroll3, "Pace: --/s", Color3.fromRGB(150, 155, 180))
+    local fastStrMachine = makeInfoLabel(scroll3, "Штанга: —", Color3.fromRGB(150, 155, 180))
 
+    -------------------------------------------------------------
+    -- Проверка: сидим ли на штанге?
+    -- Возвращает machine-модель ИЛИ nil
+    -------------------------------------------------------------
+    local function getSeatedMachine()
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hum then return nil end
+        local seat = hum.SeatPart
+        if not seat then return nil end
+
+        -- Ищем родителя, который выглядит как тренажёр
+        local mf = workspace:FindFirstChild("machinesFolder")
+        if mf then
+            local cur = seat
+            while cur and cur ~= workspace do
+                if cur.Parent == mf then
+                    return cur
+                end
+                cur = cur.Parent
+            end
+        end
+
+        -- Если не в machinesFolder — вернём верхний Model
+        local cur = seat
+        while cur and cur.Parent and cur.Parent ~= workspace do
+            cur = cur.Parent
+        end
+        return cur
+    end
+
+    -------------------------------------------------------------
+    -- Найти ЛЮБУЮ штангу (Lift, но не Deadlift / Squat / Bench press bar)
+    -------------------------------------------------------------
+    local function findAnyLift()
+        local mf = workspace:FindFirstChild("machinesFolder")
+        if not mf then return nil end
+
+        -- 1) Приоритет: name содержит "lift" и не содержит "deadlift"
+        for _, m in ipairs(mf:GetChildren()) do
+            local ln = m.Name:lower()
+            if string.find(ln, "lift", 1, true)
+                and not string.find(ln, "deadlift", 1, true) then
+                return m
+            end
+        end
+
+        -- 2) Фолбэк: любой "bar" / "bench" / "press"
+        for _, m in ipairs(mf:GetChildren()) do
+            local ln = m.Name:lower()
+            if (string.find(ln, "bar", 1, true) or string.find(ln, "bench", 1, true) or string.find(ln, "press", 1, true))
+                and not string.find(ln, "deadlift", 1, true) then
+                return m
+            end
+        end
+
+        return nil
+    end
+
+    -------------------------------------------------------------
+    -- Универсальная функция: найти InteractSeat / Seat в модели
+    -------------------------------------------------------------
+    local function getSeatPart(machine)
+        -- 1) Прямой Seat
+        local direct = machine:FindFirstChildWhichIsA("Seat", true)
+        if direct then return direct end
+
+        -- 2) InteractSeat
+        for _, d in ipairs(machine:GetDescendants()) do
+            if d:IsA("BasePart") and string.find(d.Name:lower(), "interactseat", 1, true) then
+                return d
+            end
+        end
+
+        -- 3) Любой Seat внутри модели
+        for _, d in ipairs(machine:GetDescendants()) do
+            if d:IsA("Seat") then return d end
+        end
+
+        return nil
+    end
+
+    -------------------------------------------------------------
+    -- Посадить игрока на штангу
+    -------------------------------------------------------------
+    local function seatOnMachine(machine)
+        if not machine or not machine.Parent then return false end
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return false end
+
+        local seat = getSeatPart(machine)
+        if not seat then return false end
+
+        hrp.CFrame = seat.CFrame * CFrame.new(0, 3, 0)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        task.wait(0.2)
+
+        -- Пробуем посадить через Sit
+        hum.Sit = true
+        task.wait(0.1)
+        -- Если не помогло — через E
+        if not hum.SeatPart then
+            local VIM = game:GetService("VirtualInputManager")
+            VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.05)
+            VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            task.wait(0.3)
+        end
+
+        return hum.SeatPart ~= nil
+    end
+
+    -------------------------------------------------------------
+    -- Воркер
+    -------------------------------------------------------------
     local function startFastStrengthWorker()
         task.spawn(function()
             fastStr.lastLoop = os.clock()
@@ -2872,65 +2991,63 @@ task.defer(function()
             while fastStr.running do
                 local myChar = player.Character
                 local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-                local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
 
-                if not myChar or not myHum or myHum.Health <= 0 or not myHRP then
+                if not myChar or not myHum or myHum.Health <= 0 then
                     fastStr.activeMachine = nil
-                    fastStr.seatPart = nil
-                    fastStr.reenterAt = math.max(fastStr.reenterAt, os.clock() + 2.5)
+                    fastStr.reenterAt = math.max(fastStr.reenterAt, os.clock() + 2)
                     task.wait(0.2)
                     continue
                 end
 
-                local seated = myHum.SeatPart
-                local stillOnMachine = fastStr.activeMachine
-                    and fastStr.activeMachine.Parent
-                    and seated
-                    and seated:IsDescendantOf(fastStr.activeMachine)
+                -- Проверяем, сидим ли где-то прямо сейчас
+                local seatedMachine = getSeatedMachine()
 
-                if not stillOnMachine then
+                if seatedMachine then
+                    -- Сидим — обновляем activeMachine
+                    if fastStr.activeMachine ~= seatedMachine then
+                        fastStr.activeMachine = seatedMachine
+                        fastStr.lastLoop = os.clock()
+                        fastStr.tokens = 0
+                        fastStrMachine.Text = "Штанга: " .. seatedMachine.Name
+                        fastStrStatus.Text = "Status: Фарм (сел на " .. seatedMachine.Name .. ")"
+                        fastStrStatus.TextColor3 = Color3.fromRGB(80, 255, 120)
+                    end
+                else
+                    -- Не сидим — сбрасываем и пытаемся сесть
                     fastStr.activeMachine = nil
-                    fastStr.seatPart = nil
-                    fastStr.reenterAt = math.max(fastStr.reenterAt, os.clock() + 0.5)
-                end
 
-                -- 🎯 Ищем ТОЛЬКО Industrial Bar Lift
-                if not fastStr.activeMachine and os.clock() >= fastStr.reenterAt then
-                    local lift = MachineHelper.findIndustrialLift()
-                    if lift then
-                        local entered = MachineHelper.enter(lift)
-                        if entered then
-                            task.wait(0.1)
-                            local hum = player.Character
-                                and player.Character:FindFirstChildOfClass("Humanoid")
-                            if hum and hum.SeatPart then
-                                fastStr.activeMachine = lift
+                    if fastStr.autoSeat and os.clock() >= fastStr.reenterAt then
+                        local target = findAnyLift()
+                        if target then
+                            fastStrStatus.Text = "Status: Сажусь на " .. target.Name .. "..."
+                            fastStrStatus.TextColor3 = Color3.fromRGB(180, 88, 255)
+                            fastStrMachine.Text = "Штанга: " .. target.Name
+
+                            local ok = seatOnMachine(target)
+                            if ok then
+                                fastStr.activeMachine = target
                                 fastStr.lastLoop = os.clock()
                                 fastStr.tokens = 0
-                                fastStrStatus.Text = "Status: Сел на Industrial Bar Lift"
-                                fastStrStatus.TextColor3 = Color3.fromRGB(80, 255, 120)
                             else
                                 fastStrStatus.Text = "Status: Не сел, повтор..."
                                 fastStrStatus.TextColor3 = Color3.fromRGB(255, 180, 70)
-                                fastStr.reenterAt = os.clock() + 1
+                                fastStr.reenterAt = os.clock() + 1.5
                             end
                         else
-                            fastStrStatus.Text = "Status: enter() не сработал"
+                            fastStrStatus.Text = "Status: Штанга не найдена"
                             fastStrStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-                            fastStr.reenterAt = os.clock() + 1
+                            fastStr.reenterAt = os.clock() + 2
                         end
-                    else
-                        fastStrStatus.Text = "Status: Industrial Bar Lift НЕ найден"
-                        fastStrStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
-                        fastStr.reenterAt = os.clock() + 2
                     end
                 end
 
+                -- Спамим reps, если на штанге
                 if fastStr.activeMachine then
                     local now = os.clock()
                     local dt = math.min(0.1, now - fastStr.lastLoop)
                     fastStr.lastLoop = now
 
+                    -- Адаптивный контроль
                     if tick() - fastStr.lastControlAt >= 0.5 then
                         local progressed = farm.strength.Value > fastStr.lastStrength
                         if progressed then
@@ -2969,9 +3086,13 @@ task.defer(function()
 
             fastStrStatus.Text = "Status: Остановлено"
             fastStrStatus.TextColor3 = Color3.fromRGB(255, 180, 70)
+            fastStrMachine.Text = "Штанга: —"
         end)
     end
 
+    -------------------------------------------------------------
+    -- UI
+    -------------------------------------------------------------
     makeInputRow(scroll3, "Max reps/s", "1800", function(v)
         if v and v > 0 then
             fastStr.maxRate = math.clamp(v, 400, 5000)
@@ -2979,7 +3100,11 @@ task.defer(function()
         end
     end)
 
-    makeToggleRow(scroll3, "Fast Strength (Industrial Bar Lift)", false, function(on)
+    makeToggleRow(scroll3, "Auto-Seat (искать штангу самому)", true, function(on)
+        fastStr.autoSeat = on
+    end):Set(true)
+
+    makeToggleRow(scroll3, "Fast Strength", false, function(on)
         if on and not farm.ready then
             fastStrStatus.Text = "Status: Игра не загружена"
             fastStrStatus.TextColor3 = Color3.fromRGB(255, 80, 80)
@@ -2991,12 +3116,15 @@ task.defer(function()
             fastStr.sendRate = 1200
             fastStr.tokens = 0
             fastStr.reenterAt = 0
-            fastStrStatus.Text = "Status: Ищу Industrial Bar Lift..."
+            fastStrStatus.Text = "Status: Проверяю, сижу ли на штанге..."
             fastStrStatus.TextColor3 = Color3.fromRGB(180, 88, 255)
             startFastStrengthWorker()
         end
     end)
 
+    -------------------------------------------------------------
+    -- Pace
+    -------------------------------------------------------------
     task.spawn(function()
         local sampleAt = tick()
         local sampleStr = 0
