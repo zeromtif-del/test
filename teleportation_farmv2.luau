@@ -1829,8 +1829,12 @@ end)
 --==============================================================
 --  ⚔️ ВКЛАДКА «PVP»
 --==============================================================
+--==============================================================
+--  ⚔️ ВКЛАДКА «PVP» — переработанная
+--==============================================================
 local RunService = game:GetService("RunService")
 
+-- Хелперы
 local function isAlive(p)
     return p and p.Character
         and p.Character:FindFirstChild("HumanoidRootPart")
@@ -1842,168 +1846,355 @@ local function isProtected(p)
     if not p or not p.Character then return false end
     if p.Character:FindFirstChildOfClass("ForceField") then return true end
     if p.Character:FindFirstChild("spawnProtectionHighlight") then return true end
-    local until_ = p.Character:GetAttribute("SpawnProtectedUntil")
-    return typeof(until_) == "number" and Workspace:GetServerTimeNow() < until_
+    local t = p.Character:GetAttribute("SpawnProtectedUntil")
+    return typeof(t) == "number" and Workspace:GetServerTimeNow() < t
 end
 
-local whitelisted = {}
-local function isWhitelisted(p)
-    for _, n in ipairs(whitelisted) do
-        if n:lower() == p.Name:lower() then return true end
+-- Проверка Punch-тула в Backpack/StarterPack/Character
+local function getPunchTool()
+    local char = player.Character
+    if char then
+        local inChar = char:FindFirstChild("Punch")
+        if inChar and inChar:IsA("Tool") then return inChar end
     end
-    return false
+    local bp = player:FindFirstChild("Backpack")
+    if bp then
+        local inBp = bp:FindFirstChild("Punch")
+        if inBp and inBp:IsA("Tool") then return inBp end
+    end
+    return nil
 end
 
-local function punchTarget(target)
+local function equipPunch()
+    local char = player.Character
+    if not char then return nil end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return nil end
+
+    -- Уже в руках?
+    local inHand = char:FindFirstChild("Punch")
+    if inHand and inHand:IsA("Tool") then return inHand end
+
+    -- Ищем в Backpack
+    local bp = player:FindFirstChild("Backpack")
+    if bp then
+        local tool = bp:FindFirstChild("Punch")
+        if tool and tool:IsA("Tool") then
+            hum:EquipTool(tool)
+            return tool
+        end
+    end
+
+    -- Ищем в StarterPack (для случаев, когда Backpack ещё не прогрузился)
+    local sp = player:FindFirstChild("StarterPack")
+    if sp then
+        local tool = sp:FindFirstChild("Punch")
+        if tool and tool:IsA("Tool") then
+            hum:EquipTool(tool)
+            return tool
+        end
+    end
+
+    return nil
+end
+
+-- Удар по игроку (телепорт + firetouchinterest + FireServer)
+local function hitPlayer(target)
     local myChar = player.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    local targetHRP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-    if not myHRP or not targetHRP then return end
+    local tgtHRP = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP or not tgtHRP then return false end
 
-    myHRP.CFrame = targetHRP.CFrame * CFrame.new(0, 3.5, 0)
+    -- Проверяем Punch
+    if not getPunchTool() and not myChar:FindFirstChild("Punch") then
+        equipPunch()
+    end
+
+    -- Телепорт вплотную
+    myHRP.CFrame = tgtHRP.CFrame * CFrame.new(0, 3, 0)
     myHRP.AssemblyLinearVelocity = Vector3.zero
-
+    myHRP.AssemblyAngularVelocity = Vector3.zero
     task.wait()
-    local hand = myChar:FindFirstChild("LeftHand") or myChar:FindFirstChild("RightHand")
-    if not hand then return end
 
+    -- Ищем руки
+    local leftHand = myChar:FindFirstChild("LeftHand")
+    local rightHand = myChar:FindFirstChild("RightHand")
+    if not leftHand and not rightHand then return false end
+
+    -- Touch + Fire
     pcall(function()
-        firetouchinterest(targetHRP, hand, 0)
-        firetouchinterest(targetHRP, hand, 1)
-        player.muscleEvent:FireServer("punch", hand.Name == "LeftHand" and "leftHand" or "rightHand")
+        if rightHand then
+            firetouchinterest(tgtHRP, rightHand, 0)
+            firetouchinterest(tgtHRP, rightHand, 1)
+        end
+        if leftHand then
+            firetouchinterest(tgtHRP, leftHand, 0)
+            firetouchinterest(tgtHRP, leftHand, 1)
+        end
+        player.muscleEvent:FireServer("punch", "leftHand")
+        player.muscleEvent:FireServer("punch", "rightHand")
     end)
+
+    return true
 end
 
+--==============================================================
+--  🎯 ТОЧЕЧНАЯ АТАКА (TARGET KILL)
+--==============================================================
 makeSectionHeader(scroll5, "🎯 ТОЧЕЧНАЯ АТАКА")
 
-local targetKillName = ""
 local targetKillRunning = false
+local targetKillPlayer = nil
 
-local targetBox = makeInputRow(scroll5, "Ник цели", "", nil)
-targetBox.PlaceholderText = "Ник игрока + Enter"
-targetBox.FocusLost:Connect(function(enter)
-    if enter then
-        targetKillName = targetBox.Text:gsub("%s+", "")
+-- Кнопка "Развернуть список"
+local listExpanded = false
+local expandBtn = makeActionRow(scroll5, "📜 Развернуть список игроков", Color3.fromRGB(60, 90, 180), function() end)
+
+-- Контейнер списка игроков (создаём до самой кнопки, чтобы кнопка могла его прятать)
+local playersListFrame = Instance.new("Frame")
+playersListFrame.Size = UDim2.new(1, 0, 0, 0)
+playersListFrame.BackgroundColor3 = Color3.fromRGB(28, 30, 42)
+playersListFrame.BorderSizePixel = 0
+playersListFrame.ClipsDescendants = true
+playersListFrame.Visible = false
+playersListFrame.Parent = scroll5
+Instance.new("UICorner", playersListFrame).CornerRadius = UDim.new(0, 8)
+
+local listPad = Instance.new("UIPadding")
+listPad.PaddingLeft = UDim.new(0, 6)
+listPad.PaddingRight = UDim.new(0, 6)
+listPad.PaddingTop = UDim.new(0, 6)
+listPad.PaddingBottom = UDim.new(0, 6)
+listPad.Parent = playersListFrame
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.Padding = UDim.new(0, 4)
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Parent = playersListFrame
+
+-- Показывает выбранного
+local selectedLabel = makeInfoLabel(scroll5, "🎯 Цель: не выбрана", Color3.fromRGB(255, 180, 70))
+
+local function rebuildPlayerList()
+    for _, c in ipairs(playersListFrame:GetChildren()) do
+        if c:IsA("TextButton") then c:Destroy() end
+    end
+
+    local count = 0
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player then
+            count = count + 1
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(1, 0, 0, 32)
+            b.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+            b.Text = ("%s (@%s)"):format(other.DisplayName, other.Name)
+            b.TextColor3 = CONFIG.textColor
+            b.TextSize = 13
+            b.Font = Enum.Font.GothamMedium
+            b.AutoButtonColor = false
+            b.LayoutOrder = count
+            b.Parent = playersListFrame
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+
+            b.MouseEnter:Connect(function()
+                b.BackgroundColor3 = Color3.fromRGB(50, 58, 82)
+            end)
+            b.MouseLeave:Connect(function()
+                b.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+            end)
+            b.MouseButton1Click:Connect(function()
+                targetKillPlayer = other
+                selectedLabel.Text = ("🎯 Цель: %s (@%s)"):format(other.DisplayName, other.Name)
+                -- Сворачиваем список после выбора
+                listExpanded = false
+                playersListFrame.Visible = false
+                expandBtn.Text = "📜 Развернуть список игроков"
+            end)
+        end
+    end
+
+    if count == 0 then
+        local empty = Instance.new("TextLabel")
+        empty.Size = UDim2.new(1, 0, 0, 32)
+        empty.BackgroundTransparency = 1
+        empty.Text = "На сервере нет других игроков"
+        empty.TextColor3 = Color3.fromRGB(150, 155, 180)
+        empty.TextSize = 12
+        empty.Font = Enum.Font.Gotham
+        empty.Parent = playersListFrame
+    end
+end
+
+-- Клик по кнопке «Развернуть» — сворачивает/разворачивает список
+expandBtn.MouseButton1Click:Connect(function()
+    listExpanded = not listExpanded
+    if listExpanded then
+        rebuildPlayerList()
+        -- Считаем высоту: 32 (кнопка) + 4 (padding) за каждого + padding сверху/снизу
+        local count = 0
+        for _, c in ipairs(playersListFrame:GetChildren()) do
+            if c:IsA("TextButton") or (c:IsA("TextLabel") and c.Text ~= "") then
+                count = count + 1
+            end
+        end
+        local h = math.max(36, count * 36 + 12)
+        playersListFrame.Size = UDim2.new(1, 0, 0, h)
+        playersListFrame.Visible = true
+        expandBtn.Text = "📜 Свернуть список"
+    else
+        playersListFrame.Visible = false
+        expandBtn.Text = "📜 Развернуть список игроков"
     end
 end)
 
-makeToggleRow(scroll5, "Auto Kill Target", false, function(on)
+-- Обновляем список при изменении состава игроков
+Players.PlayerAdded:Connect(function()
+    if listExpanded then rebuildPlayerList() end
+end)
+Players.PlayerRemoving:Connect(function()
+    if listExpanded then rebuildPlayerList() end
+end)
+
+-- Тумблер "Target Kill"
+makeToggleRow(scroll5, "Target Kill (по всей карте)", false, function(on)
     targetKillRunning = on
+
+    if on and not targetKillPlayer then
+        selectedLabel.Text = "🎯 Цель: не выбрана (выбери в списке выше)"
+        selectedLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        return
+    end
+
     if on then
+        selectedLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
         task.spawn(function()
             while targetKillRunning do
-                if #targetKillName > 0 then
-                    local target = Players:FindFirstChild(targetKillName)
-                    if target and target ~= player and isAlive(target) and not isProtected(target) then
-                        punchTarget(target)
+                local target = targetKillPlayer
+                -- Проверяем, что цель ещё в игре и жива
+                if target and target.Parent and target.Character then
+                    if isAlive(target) and not isProtected(target) then
+                        hitPlayer(target)
+                        task.wait(0.03)
+                    else
+                        -- Цель мертва или под защитой — ждём респавна
+                        task.wait(0.2)
                     end
+                else
+                    -- Цель вышла из игры — вырубаем
+                    if target and not target.Parent then
+                        targetKillRunning = false
+                        selectedLabel.Text = "🎯 Цель: вышла из игры"
+                        selectedLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+                    end
+                    task.wait(0.3)
                 end
-                task.wait(0.05)
             end
+            selectedLabel.Text = "🎯 Цель: не активна"
+            selectedLabel.TextColor3 = Color3.fromRGB(255, 180, 70)
         end)
+    else
+        selectedLabel.TextColor3 = Color3.fromRGB(255, 180, 70)
     end
 end)
 
-makeSectionHeader(scroll5, "⚔️ МАССОВАЯ АТАКА")
+makeActionRow(scroll5, "🚫 Сбросить цель", Color3.fromRGB(90, 45, 55), function()
+    targetKillPlayer = nil
+    targetKillRunning = false
+    selectedLabel.Text = "🎯 Цель: не выбрана"
+    selectedLabel.TextColor3 = Color3.fromRGB(255, 180, 70)
+end)
+
+--==============================================================
+--  ⚔️ KILL AURA (радиус)
+--==============================================================
+makeSectionHeader(scroll5, "⚔️ KILL AURA")
 
 local killAuraRunning = false
-local killAuraRange = 20
+local killAuraRange = 30
+local killAuraPlayerIndex = 1  -- индекс в списке (чтобы убивать по одному)
 
-makeToggleRow(scroll5, "Kill Aura (авто-удар)", false, function(on)
+makeInputRow(scroll5, "Радиус", "30", function(v)
+    killAuraRange = math.clamp(v, 5, 500)
+end)
+
+makeToggleRow(scroll5, "Kill Aura (в радиусе)", false, function(on)
     killAuraRunning = on
-end)
+    if not on then return end
 
-makeInputRow(scroll5, "Радиус ауры", "20", function(v)
-    killAuraRange = math.clamp(v, 5, 140)
-end)
-
-task.spawn(function()
-    while true do
-        if killAuraRunning then
+    task.spawn(function()
+        while killAuraRunning do
             local myChar = player.Character
             local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-            if myHRP then
-                for _, other in ipairs(Players:GetPlayers()) do
-                    if other ~= player and not isWhitelisted(other) and isAlive(other) and not isProtected(other) then
-                        local oHRP = other.Character.HumanoidRootPart
-                        if (myHRP.Position - oHRP.Position).Magnitude <= killAuraRange then
-                            punchTarget(other)
-                        end
+            if not myHRP then task.wait(0.2); continue end
+
+            -- Собираем игроков в радиусе
+            local inRange = {}
+            for _, other in ipairs(Players:GetPlayers()) do
+                if other ~= player and isAlive(other) and not isProtected(other) then
+                    local oHRP = other.Character.HumanoidRootPart
+                    if (myHRP.Position - oHRP.Position).Magnitude <= killAuraRange then
+                        table.insert(inRange, other)
                     end
                 end
             end
-            task.wait(0.05)
-        else
-            task.wait(0.2)
+
+            if #inRange == 0 then
+                task.wait(0.3)
+                continue
+            end
+
+            -- Убиваем по одному по кругу
+            local target = inRange[((killAuraPlayerIndex - 1) % #inRange) + 1]
+            killAuraPlayerIndex = killAuraPlayerIndex + 1
+
+            if target and isAlive(target) then
+                hitPlayer(target)
+            end
+
+            task.wait(0.03)
         end
-    end
+    end)
 end)
 
-makeToggleRow(scroll5, "Kill Everyone (без whitelist)", false, function(on)
+--==============================================================
+--  💀 KILL EVERYONE (по всей карте)
+--==============================================================
+makeSectionHeader(scroll5, "💀 УБИЙСТВО ВСЕХ")
+
+makeToggleRow(scroll5, "Kill Everyone (вся карта)", false, function(on)
     _G.KillEveryone = on
-    if on then
-        task.spawn(function()
-            while _G.KillEveryone do
-                for _, other in ipairs(Players:GetPlayers()) do
-                    if other ~= player and not isWhitelisted(other) and isAlive(other) and not isProtected(other) then
-                        punchTarget(other)
-                        RunService.Heartbeat:Wait()
-                    end
+    if not on then return end
+
+    task.spawn(function()
+        local idx = 1
+        while _G.KillEveryone do
+            local myChar = player.Character
+            local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if not myHRP then task.wait(0.2); continue end
+
+            local targets = {}
+            for _, other in ipairs(Players:GetPlayers()) do
+                if other ~= player and isAlive(other) and not isProtected(other) then
+                    table.insert(targets, other)
                 end
-                task.wait(0.05)
             end
-        end)
-    end
-end)
 
-makeSectionHeader(scroll5, "🛡️ WHITELIST")
+            if #targets == 0 then
+                task.wait(0.3)
+                continue
+            end
 
-local whitelistInput = makeInputRow(scroll5, "Добавить ник", "", nil)
-whitelistInput.PlaceholderText = "Ник игрока + Enter"
-whitelistInput.FocusLost:Connect(function(enter)
-    if enter then
-        local name = whitelistInput.Text:gsub("%s+", "")
-        if #name > 0 then
-            table.insert(whitelisted, name)
-            whitelistInput.Text = ""
+            -- Идём по кругу, чтобы всем досталось
+            local target = targets[((idx - 1) % #targets) + 1]
+            idx = idx + 1
+
+            if target and isAlive(target) then
+                hitPlayer(target)
+            end
+
+            task.wait(0.03)
         end
-    end
-end)
-
-local whitelistLabel = makeInfoLabel(scroll5, "Whitelist: пусто", Color3.fromRGB(150, 155, 180))
-
-makeActionRow(scroll5, "🧹 Очистить whitelist", Color3.fromRGB(90, 45, 55), function()
-    whitelisted = {}
-end)
-
-makeToggleRow(scroll5, "Whitelist Friends", false, function(on)
-    _G.WhitelistFriends = on
-    if on then
-        for _, other in ipairs(Players:GetPlayers()) do
-            if other ~= player and other:IsFriendsWith(player.UserId) and not isWhitelisted(other) then
-                table.insert(whitelisted, other.Name)
-            end
-        end
-        task.spawn(function()
-            while _G.WhitelistFriends do
-                for _, other in ipairs(Players:GetPlayers()) do
-                    if other ~= player and other:IsFriendsWith(player.UserId) and not isWhitelisted(other) then
-                        table.insert(whitelisted, other.Name)
-                    end
-                end
-                task.wait(3)
-            end
-        end)
-    end
-end)
-
-task.spawn(function()
-    while true do
-        whitelistLabel.Text = #whitelisted == 0
-            and "Whitelist: пусто"
-            or "Whitelist: " .. table.concat(whitelisted, ", ")
-        task.wait(1)
-    end
+    end)
 end)
 
 --==============================================================
