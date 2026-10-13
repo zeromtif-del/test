@@ -1222,68 +1222,7 @@ local repState = {
     startStrength = 0,
 }
 
---==============================================================
---  🌾 ПОЛЕ СКОРОСТИ Fast Rep (без лимита)
---==============================================================
-makeInputRow(scroll3, "Fast Rep: reps/s", "659", function(v)
-    if v and v > 0 then
-        repState.maxRate = math.floor(v)   -- 🔥 БЕЗ ЛИМИТА
-        repState.sendRate = math.min(repState.sendRate, repState.maxRate)
-    end
-end)
-
-local repWorker = nil
-local function startRepWorker()
-    if repWorker then return end
-    repState.lastLoop = os.clock()
-    repState.lastControlAt = tick()
-    repState.lastStrength = farm.strength.Value
-    repState.tokens = 0
-    repState.sessionStart = tick()
-    repState.startStrength = farm.strength.Value
-
-    repWorker = task.spawn(function()
-        while repState.running do
-            local now = os.clock()
-            local dt = math.min(0.1, now - repState.lastLoop)
-            repState.lastLoop = now
-
-            -- Автоконтроль скорости
-            if tick() - repState.lastControlAt >= 0.5 then
-                local progressed = farm.strength.Value > repState.lastStrength
-                if progressed then
-                    repState.stalledIntervals = 0
-                    repState.sendRate = math.min(repState.maxRate, repState.sendRate * 1.12)
-                    statusLabel.Text = ("Status: Фарм | %.0f reps/s"):format(repState.sendRate)
-                    statusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
-                else
-                    repState.stalledIntervals = repState.stalledIntervals + 1
-                end
-                if repState.stalledIntervals >= 2 then
-                    repState.sendRate = math.max(200, repState.sendRate * 0.65)
-                    repState.tokens = 0
-                    repState.stalledIntervals = 0
-                    statusLabel.Text = ("Status: Замедляюсь | %.0f reps/s"):format(repState.sendRate)
-                    statusLabel.TextColor3 = Color3.fromRGB(255, 180, 70)
-                end
-                repState.lastControlAt = tick()
-                repState.lastStrength = farm.strength.Value
-            end
-
-            -- Отправка
-            repState.tokens = math.min(512, repState.tokens + repState.sendRate * dt)
-            local burst = math.max(1, math.min(512, math.ceil(repState.sendRate * 0.06)))
-            local count = math.min(math.floor(repState.tokens), burst)
-            for _ = 1, count do
-                farm.muscleEvent:FireServer("rep")
-            end
-            repState.tokens = repState.tokens - count
-
-            RS.Heartbeat:Wait()
-        end
-        repWorker = nil
-    end)
-end
+_G.__repState = repState
 
 local function stopRep()
     repState.running = false
@@ -2860,3 +2799,72 @@ end)
 print("[TeleportMenu] Готово. 8 вкладок, T — открыть меню.")
 
 print("[TeleportMenu] Drag & Drop включён: меню — за заголовок, кнопка — за саму себя.")
+
+--==============================================================
+--  🌾 ПОЛЕ СКОРОСТИ Fast Rep (в самом конце — все хелперы готовы)
+--==============================================================
+task.defer(function()
+    task.wait(0.2)
+
+    local parent = scroll3
+
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 42)
+    row.BackgroundColor3 = Color3.fromRGB(38, 42, 58)
+    row.BorderSizePixel = 0
+    row.Parent = parent
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = CONFIG.accentColor
+    stroke.Thickness = 1
+    stroke.Transparency = 0.8
+    stroke.Parent = row
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0.5, -15, 1, 0)
+    lbl.Position = UDim2.new(0, 15, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = "Fast Rep: reps/s"
+    lbl.TextColor3 = CONFIG.textColor
+    lbl.TextSize = 14
+    lbl.Font = Enum.Font.GothamMedium
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = row
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(0.5, -20, 0, 28)
+    box.Position = UDim2.new(0.5, 5, 0.5, -14)
+    box.BackgroundColor3 = Color3.fromRGB(28, 32, 44)
+    box.Text = "659"
+    box.PlaceholderText = "Введи число"
+    box.TextColor3 = CONFIG.textColor
+    box.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+    box.TextSize = 14
+    box.Font = Enum.Font.Gotham
+    box.ClearTextOnFocus = false
+    box.Parent = row
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6)
+
+    -- 🔒 Фильтр: только цифры 0-9
+    local updating = false
+    box:GetPropertyChangedSignal("Text"):Connect(function()
+        if updating then return end
+        updating = true
+        local cleaned = box.Text:gsub("%D", "")
+        if cleaned ~= box.Text then box.Text = cleaned end
+        updating = false
+    end)
+
+    box.FocusLost:Connect(function(enter)
+        if enter then
+            local v = tonumber(box.Text)
+            if v and v > 0 and _G.__repState then
+                _G.__repState.maxRate = math.floor(v)
+                _G.__repState.sendRate = math.min(_G.__repState.sendRate, _G.__repState.maxRate)
+            end
+        end
+    end)
+end)
+
+print("[TeleportMenu] без ошибок.")
