@@ -1496,97 +1496,145 @@ end)
 --==============================================================
 --  🤖 ВКЛАДКА 6 — АВТО
 --==============================================================
+--==============================================================
+--  👑 AUTO BOSS — полная версия
+--==============================================================
 makeSectionHeader(scroll6, "👑 Auto Boss")
 
-local bossData = { running = false, autoChest = false, lockedBoss = nil }
+local bossData = {
+    running = false,
+    autoChest = false,
+    lockedBoss = nil,
+}
 
-local function isBossModel(d)
-    if not d:IsA("Model") then return false end
-    local name = d.Name:lower()
-    local isBossName = string.find(name, "boss", 1, true) ~= nil
-        or string.find(name, "king", 1, true) ~= nil
-        or d:GetAttribute("IsBoss") == true
-    if not isBossName then return false end
-    local hum = d:FindFirstChildOfClass("Humanoid")
-    local hrp = d:FindFirstChild("HumanoidRootPart")
-    if not hum or not hrp then return false end
-    return hum.Health > 0
+---------------------------------------------------------------
+-- Папка BossArena
+---------------------------------------------------------------
+local function getBossArena()
+    local ev = workspace:FindFirstChild("Events")
+    if not ev then return nil end
+    return ev:FindFirstChild("BossArena")
 end
 
+---------------------------------------------------------------
+-- Проверка: это живой босс с "Boss" в имени?
+---------------------------------------------------------------
+local function isAliveBoss(d)
+    if not d or not d.Parent or not d:IsA("Model") then return false end
+    if not string.find(d.Name:lower(), "boss", 1, true) then return false end
+
+    local part = d:FindFirstChild("HumanoidRootPart")
+        or d:FindFirstChildWhichIsA("BasePart", true)
+    if not part then return false end
+
+    local hum = d:FindFirstChildOfClass("Humanoid")
+    if hum then return hum.Health > 0 end
+
+    local hp = d:GetAttribute("Health")
+    if type(hp) == "number" then return hp > 0 end
+
+    return true
+end
+
+---------------------------------------------------------------
+-- Поиск ближайшего босса
+---------------------------------------------------------------
 local function findBoss()
     local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not myHRP then return nil end
-    local candidates = {
-        workspace:FindFirstChild("bossFolder"),
-        workspace:FindFirstChild("bossesFolder"),
-        workspace:FindFirstChild("Bosses"),
-        workspace:FindFirstChild("BossFolder"),
-        workspace,
-    }
+
     local best, bestDist = nil, math.huge
-    for _, root in ipairs(candidates) do
-        if root then
-            for _, d in ipairs(root:GetChildren()) do
-                if isBossModel(d) then
-                    local dist = (d.HumanoidRootPart.Position - myHRP.Position).Magnitude
-                    if dist < bestDist then best, bestDist = d, dist end
+
+    local function scan(root)
+        for _, d in ipairs(root:GetChildren()) do
+            if isAliveBoss(d) then
+                local part = d:FindFirstChild("HumanoidRootPart")
+                    or d:FindFirstChildWhichIsA("BasePart", true)
+                if part then
+                    local dist = (part.Position - myHRP.Position).Magnitude
+                    if dist < bestDist then
+                        best, bestDist = d, dist
+                    end
                 end
             end
         end
     end
+
+    local arena = getBossArena()
+    if arena then scan(arena) end
+    if not best then scan(workspace) end
+
     return best
 end
 
-local function getBossHitbox(boss)
-    if not boss then return nil end
-    for _, d in ipairs(boss:GetDescendants()) do
-        if d:IsA("BasePart") and string.find(d.Name:lower(), "hitbox", 1, true) then
-            return d
-        end
-    end
-    return boss:FindFirstChild("HumanoidRootPart")
-end
-
+---------------------------------------------------------------
+-- Удар по боссу
+---------------------------------------------------------------
 local function attackBoss(boss)
     if not boss or not boss.Parent then return end
+
+    local part = boss:FindFirstChild("HumanoidRootPart")
+        or boss:FindFirstChildWhichIsA("BasePart", true)
+    if not part then return end
+
     local hum = boss:FindFirstChildOfClass("Humanoid")
-    local hrp = boss:FindFirstChild("HumanoidRootPart")
-    if not hum or not hrp or hum.Health <= 0 then return end
+    if hum and hum.Health <= 0 then return end
 
     local myChar = player.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not myHRP then return end
 
-    myHRP.CFrame = CFrame.new(hrp.Position + Vector3.new(0, 3, 0), hrp.Position)
+    -- Авто-экип Punch
+    if not myChar:FindFirstChild("Punch") then
+        local bp = player:FindFirstChild("Backpack")
+        local tool = bp and bp:FindFirstChild("Punch")
+        if tool then
+            local mh = myChar:FindFirstChildOfClass("Humanoid")
+            if mh then pcall(function() mh:EquipTool(tool) end) end
+        end
+    end
+
+    -- Телепорт вплотную
+    myHRP.CFrame = CFrame.new(part.Position + Vector3.new(0, 3, 0), part.Position)
     myHRP.AssemblyLinearVelocity = Vector3.zero
     myHRP.AssemblyAngularVelocity = Vector3.zero
 
+    -- Удары
     pcall(function()
-        local hitbox = getBossHitbox(boss)
         local lh = myChar:FindFirstChild("LeftHand")
         local rh = myChar:FindFirstChild("RightHand")
-        if hitbox then
-            if lh then firetouchinterest(hitbox, lh, 0); firetouchinterest(hitbox, lh, 1) end
-            if rh then firetouchinterest(hitbox, rh, 0); firetouchinterest(hitbox, rh, 1) end
+        if lh then
+            firetouchinterest(part, lh, 0)
+            firetouchinterest(part, lh, 1)
+        end
+        if rh then
+            firetouchinterest(part, rh, 0)
+            firetouchinterest(part, rh, 1)
         end
         player.muscleEvent:FireServer("punch", "leftHand")
         player.muscleEvent:FireServer("punch", "rightHand")
     end)
 end
 
+---------------------------------------------------------------
+-- Сбор сундуков
+---------------------------------------------------------------
 local function collectChest()
     local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not myHRP then return end
     for _, d in ipairs(workspace:GetDescendants()) do
         if d:IsA("BasePart") or d:IsA("Model") then
             local name = d.Name:lower()
-            if string.find(name, "chest", 1, true) or string.find(name, "reward", 1, true) or string.find(name, "loot", 1, true) then
+            if string.find(name, "chest", 1, true)
+                or string.find(name, "reward", 1, true)
+                or string.find(name, "loot", 1, true) then
                 local part = d:IsA("BasePart") and d or d:FindFirstChildWhichIsA("BasePart")
                 if part then
                     myHRP.CFrame = CFrame.new(part.Position + Vector3.new(0, 3, 0))
                     task.wait(0.05)
                     pcall(function()
-                        firetouchinterest(part, myHRP, 0); firetouchinterest(part, myHRP, 1)
+                        firetouchinterest(part, myHRP, 0)
+                        firetouchinterest(part, myHRP, 1)
                     end)
                 end
             end
@@ -1594,34 +1642,78 @@ local function collectChest()
     end
 end
 
+---------------------------------------------------------------
+-- UI + воркер
+---------------------------------------------------------------
 local bossStatus = makeInfoLabel(scroll6, "Босс: —", CONFIG.textDim)
 
 makeToggleRow(scroll6, "Auto Boss", false, function(on)
     bossData.running = on
+
     if on then
         bossData.lockedBoss = nil
+
+        -- Воркер
         task.spawn(function()
             while bossData.running do
                 local myChar = player.Character
                 local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-                if not myHRP then task.wait(0.2); continue end
+
+                if not myHRP then
+                    task.wait(0.2)
+                    continue
+                end
+
                 local boss = bossData.lockedBoss
-                local hum = boss and boss:FindFirstChildOfClass("Humanoid")
-                if not boss or not boss.Parent or not hum or hum.Health <= 0 then
+
+                if not isAliveBoss(boss) then
                     bossData.lockedBoss = nil
                     boss = findBoss()
-                    bossData.lockedBoss = boss
+                    if boss then
+                        bossData.lockedBoss = boss
+                        print("[AutoBoss] Новый босс:", boss:GetFullName())
+                    end
                 end
-                if boss then
-                    for _ = 1, 15 do
+
+                if boss and isAliveBoss(boss) then
+                    for _ = 1, 20 do
                         if not bossData.running then break end
+                        if not isAliveBoss(boss) then break end
                         attackBoss(boss)
+                        task.wait(0.02)
                     end
                 else
                     task.wait(0.3)
                 end
+
                 task.wait(0.02)
             end
+        end)
+
+        -- Обновление статуса
+        task.spawn(function()
+            while bossData.running do
+                if bossData.lockedBoss and bossData.lockedBoss.Parent then
+                    local hum = bossData.lockedBoss:FindFirstChildOfClass("Humanoid")
+                    local hp = hum and hum.Health or 0
+                    bossStatus.Text = ("🎯 %s (HP %d)"):format(
+                        bossData.lockedBoss.Name, math.floor(hp))
+                    bossStatus.TextColor3 = CONFIG.green
+                else
+                    local arena = getBossArena()
+                    local count = 0
+                    if arena then
+                        for _, d in ipairs(arena:GetChildren()) do
+                            if isAliveBoss(d) then count = count + 1 end
+                        end
+                    end
+                    bossStatus.Text = ("Босс: — (в BossArena: %d)"):format(count)
+                    bossStatus.TextColor3 = CONFIG.textDim
+                end
+                task.wait(0.5)
+            end
+            bossStatus.Text = "Босс: —"
+            bossStatus.TextColor3 = CONFIG.textDim
         end)
     else
         bossData.lockedBoss = nil
@@ -1637,22 +1729,6 @@ makeToggleRow(scroll6, "Auto Collect Chest", false, function(on)
                 task.wait(0.5)
             end
         end)
-    end
-end)
-
-task.spawn(function()
-    while true do
-        if bossData.lockedBoss and bossData.lockedBoss.Parent then
-            local hum = bossData.lockedBoss:FindFirstChildOfClass("Humanoid")
-            if hum then
-                bossStatus.Text = ("🎯 %s (HP %d)"):format(bossData.lockedBoss.Name, math.floor(hum.Health))
-                bossStatus.TextColor3 = CONFIG.green
-            end
-        else
-            bossStatus.Text = "Босс: —"
-            bossStatus.TextColor3 = CONFIG.textDim
-        end
-        task.wait(0.5)
     end
 end)
 
