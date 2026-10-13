@@ -29,6 +29,78 @@ local CONFIG = {
 }
 
 --==============================================================
+--  🔧 ОБЩИЕ ФУНКЦИИ ДЛЯ ТРЕНАЖЁРОВ (используются Auto и Fast Strength)
+--==============================================================
+local MachineHelper = {}
+do
+    local VIM = game:GetService("VirtualInputManager")
+
+    -- Найти модель по подстроке в имени
+    function MachineHelper.findByName(substr)
+        local mf = workspace:FindFirstChild("machinesFolder")
+        if not mf then return nil end
+        local lower = substr:lower()
+        for _, m in ipairs(mf:GetChildren()) do
+            if string.find(m.Name:lower(), lower, 1, true) then
+                return m
+            end
+        end
+        return nil
+    end
+
+-- Найти именно Industrial Bar Lift
+function MachineHelper.findIndustrialLift()
+    local mf = workspace:FindFirstChild("machinesFolder")
+    if not mf then return nil end
+
+    -- 1. Точное имя
+    local exact = mf:FindFirstChild("Industrial Bar Lift")
+    if exact then return exact end
+
+    -- 2. По подстроке "industrial" + "bar" + "lift"
+    for _, m in ipairs(mf:GetChildren()) do
+        local ln = m.Name:lower()
+        if string.find(ln, "industrial", 1, true)
+            and string.find(ln, "bar", 1, true)
+            and string.find(ln, "lift", 1, true) then
+            return m
+        end
+    end
+
+    -- 3. Фолбэк — просто industrial + lift
+    for _, m in ipairs(mf:GetChildren()) do
+        local ln = m.Name:lower()
+        if string.find(ln, "industrial", 1, true)
+            and string.find(ln, "lift", 1, true) then
+            return m
+        end
+    end
+
+    return nil
+end
+
+    -- Сесть на тренажёр через E
+    function MachineHelper.enter(machine)
+        if not machine or not machine.Parent then return false end
+        local char = player.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local seat = MachineHelper.getInteractSeat(machine)
+        if not hrp or not seat or not hum then return false end
+
+        hrp.CFrame = seat.CFrame * CFrame.new(0, 3, 0)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        hrp.AssemblyAngularVelocity = Vector3.zero
+        task.wait(0.4)
+        VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0.1)
+        VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        task.wait(0.4)
+        return true
+    end
+end
+
+--==============================================================
 --  🔒 ВКЛАДКА 1: ПРЕДУСТАНОВЛЕННЫЕ ТОЧКИ (менять нельзя, только ты)
 --  Дописывай свои локации здесь.
 --==============================================================
