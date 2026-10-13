@@ -461,18 +461,7 @@ local function createTeleportButton(data, parentScroll, order, allowDelete, inde
 
     local tInfo = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
-toggleButton.MouseEnter:Connect(function()
-    TweenService:Create(toggleButton, TweenInfo.new(0.15), {
-        Size = UDim2.fromOffset(70, 70),
-    }):Play()
-end)
-
-toggleButton.MouseLeave:Connect(function()
-    TweenService:Create(toggleButton, TweenInfo.new(0.15), {
-        Size = UDim2.fromOffset(60, 60),
-    }):Play()
-end)
-
+    -- --- КЛИК = ТЕЛЕПОРТ ---
     btn.MouseButton1Click:Connect(function()
         teleportTo(data.position)
         flashScreen()
@@ -825,16 +814,10 @@ end)
 closeButton.MouseButton1Click:Connect(closeMenu)
 
 toggleButton.MouseEnter:Connect(function()
-    TweenService:Create(toggleButton, TweenInfo.new(0.15), {
-        Size = UDim2.fromOffset(70, 70),
-        Position = UDim2.new(0, 25, 0.5, -35),
-    }):Play()
+    toggleButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
 end)
 toggleButton.MouseLeave:Connect(function()
-    TweenService:Create(toggleButton, TweenInfo.new(0.15), {
-        Size = UDim2.fromOffset(60, 60),
-        Position = UDim2.new(0, 30, 0.5, -30),
-    }):Play()
+    toggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 end)
 
 --==============================================================
@@ -1287,8 +1270,6 @@ local function doOneRebirth()
 
     if not rebirthState.running then return end
 
-    -- 2. Меняем петов на rebirth
-    equipBestRebirthPets()
     task.wait(0.25)
 
     -- 3. Жмём перерождение
