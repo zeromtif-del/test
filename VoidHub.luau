@@ -586,6 +586,7 @@ local TABS = {
     { icon = "🤖", name = "Авто" },
     { icon = "📦", name = "Инвентарь" },
     { icon = "📊", name = "Статы" },
+    { icon = "🎃", name = "Halloween" },
 }
 
 local tabButtons = {}
@@ -640,7 +641,7 @@ end
 -- Псевдонимы
 local scroll1, scroll2, scroll3 = scrolls[1], scrolls[2], scrolls[3]
 local scroll4, scroll5, scroll6 = scrolls[4], scrolls[5], scrolls[6]
-local scroll7, scroll8 = scrolls[7], scrolls[8]
+local scroll7, scroll8, scroll9 = scrolls[7], scrolls[8], scrolls[9]
 
 -- Switch function
 switchTab = function(idx)
@@ -2260,3 +2261,437 @@ makeDraggable(mainFrame, header)
 makeDraggable(toggleButton)
 
 print("[Void Hub] Загружено. Клавиша меню: F1")
+
+--==============================================================
+--  🎃 ВКЛАДКА «HALLOWEEN BOSS»
+--==============================================================
+task.defer(function()
+    task.wait(0.3)
+
+    -------------------------------------------------------------
+    -- ✏️ СЮДА ВПИШИ НУЖНЫЕ ИМЕНА БОССОВ
+    -- Если оставить пустым — скрипт сам найдёт всех,
+    -- у кого в имени есть "halloween" или кто сидит в папке "Halloween"
+    -------------------------------------------------------------
+    local HALLOWEEN_BOSSES = {
+        "Pumpkin Titan",
+        "Grim Reaper",
+        "Scarecrow Colossus",
+        "Frankenbrute",
+        -- и так далее...
+    }
+
+    -------------------------------------------------------------
+    -- Состояние
+    -------------------------------------------------------------
+    local halloween = {
+        running = false,
+        lockedBoss = nil,
+        selectedName = nil,
+        listExpanded = false,
+    }
+
+    -------------------------------------------------------------
+    -- Проверки
+    -------------------------------------------------------------
+    local function getBossPart(model)
+        return model:FindFirstChild("HumanoidRootPart")
+            or model:FindFirstChildWhichIsA("BasePart", true)
+    end
+
+    local function isAliveModel(m)
+        if not m or not m.Parent or not m:IsA("Model") then return false end
+        if m == player.Character then return false end
+        if Players:GetPlayerFromCharacter(m) then return false end
+
+        local part = getBossPart(m)
+        if not part then return false end
+
+        local hum = m:FindFirstChildOfClass("Humanoid")
+        if hum then return hum.Health > 0 end
+
+        local hp = m:GetAttribute("Health")
+        if type(hp) == "number" then return hp > 0 end
+
+        return true
+    end
+
+    -------------------------------------------------------------
+    -- Проверка "это Halloween-босс?"
+    -------------------------------------------------------------
+    local function isHalloweenBoss(m)
+        if not isAliveModel(m) then return false end
+        local name = m.Name
+
+        -- 1) Точное совпадение из списка
+        for _, bossName in ipairs(HALLOWEEN_BOSSES) do
+            if name == bossName then return true end
+        end
+
+        -- 2) Если список не задан — ищем по ключевым словам
+        if #HALLOWEEN_BOSSES == 0 then
+            local lower = name:lower()
+            if string.find(lower, "halloween", 1, true) then return true end
+            if string.find(lower, "pumpkin", 1, true) then return true end
+            if string.find(lower, "witch", 1, true) then return true end
+            if string.find(lower, "candy", 1, true) then return true end
+
+            -- 3) Или сидит в папке с "halloween" / "event" в имени
+            local cur = m.Parent
+            local depth = 0
+            while cur and cur ~= workspace and depth < 5 do
+                local pn = cur.Name:lower()
+                if string.find(pn, "halloween", 1, true) then return true end
+                cur = cur.Parent
+                depth = depth + 1
+            end
+        end
+
+        return false
+    end
+
+    -------------------------------------------------------------
+    -- Собрать список живых Halloween-боссов
+    -------------------------------------------------------------
+    local function scanHalloweenBosses()
+        local list = {}
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if isHalloweenBoss(d) then
+                table.insert(list, d)
+            end
+        end
+        return list
+    end
+
+    -------------------------------------------------------------
+    -- Найти ближайшего из списка
+    -------------------------------------------------------------
+    local function findNearest(list)
+        local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+        if not myHRP then return nil end
+
+        local best, bestDist = nil, math.huge
+        for _, m in ipairs(list) do
+            local part = getBossPart(m)
+            if part then
+                local d = (part.Position - myHRP.Position).Magnitude
+                if d < bestDist then
+                    best, bestDist = m, d
+                end
+            end
+        end
+        return best
+    end
+
+    -------------------------------------------------------------
+    -- Найти конкретного босса по имени
+    -------------------------------------------------------------
+    local function findByName(name)
+        if not name then return nil end
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if d:IsA("Model") and d.Name == name and isAliveModel(d) then
+                return d
+            end
+        end
+        return nil
+    end
+
+    -------------------------------------------------------------
+    -- Атака
+    -------------------------------------------------------------
+    local function attackBoss(boss)
+        if not boss or not boss.Parent then return end
+        local part = getBossPart(boss)
+        if not part then return end
+
+        local hum = boss:FindFirstChildOfClass("Humanoid")
+        if hum and hum.Health <= 0 then return end
+
+        local myChar = player.Character
+        local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myHRP then return end
+
+        -- Auto-экип Punch
+        if not myChar:FindFirstChild("Punch") then
+            local bp = player:FindFirstChild("Backpack")
+            local tool = bp and bp:FindFirstChild("Punch")
+            if tool then
+                local mh = myChar:FindFirstChildOfClass("Humanoid")
+                if mh then pcall(function() mh:EquipTool(tool) end) end
+            end
+        end
+
+        -- Телепорт вплотную
+        myHRP.CFrame = CFrame.new(part.Position + Vector3.new(0, 3, 0), part.Position)
+        myHRP.AssemblyLinearVelocity = Vector3.zero
+        myHRP.AssemblyAngularVelocity = Vector3.zero
+
+        -- Удары
+        pcall(function()
+            local lh = myChar:FindFirstChild("LeftHand")
+            local rh = myChar:FindFirstChild("RightHand")
+            if lh then
+                firetouchinterest(part, lh, 0)
+                firetouchinterest(part, lh, 1)
+            end
+            if rh then
+                firetouchinterest(part, rh, 0)
+                firetouchinterest(part, rh, 1)
+            end
+            player.muscleEvent:FireServer("punch", "leftHand")
+            player.muscleEvent:FireServer("punch", "rightHand")
+        end)
+    end
+
+    -------------------------------------------------------------
+    -- UI
+    -------------------------------------------------------------
+    makeSectionHeader(scroll9, "🎃 Halloween Boss")
+
+    local halloweenStatus = makeInfoLabel(scroll9, "Статус: ожидание", CONFIG.textDim)
+    local selectedBossLabel = makeInfoLabel(scroll9, "🎯 Цель: не выбрана", CONFIG.orange)
+    local countLabel = makeInfoLabel(scroll9, "Найдено боссов: 0", CONFIG.textDim)
+
+    -------------------------------------------------------------
+    -- Разворачиваемый список боссов
+    -------------------------------------------------------------
+    local expandBtn = makeActionRow(scroll9, "📜 Развернуть список боссов", Color3.fromRGB(60, 90, 180), function() end)
+
+    -- Контейнер списка
+    local listFrame = Instance.new("Frame")
+    listFrame.Size = UDim2.new(1, 0, 0, 0)
+    listFrame.BackgroundColor3 = CONFIG.panelColor
+    listFrame.BorderSizePixel = 0
+    listFrame.ClipsDescendants = true
+    listFrame.Visible = false
+    listFrame.Parent = scroll9
+    Instance.new("UICorner", listFrame).CornerRadius = UDim.new(0, 8)
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 4)
+    listLayout.Parent = listFrame
+
+    local listPad = Instance.new("UIPadding")
+    listPad.PaddingLeft = UDim.new(0, 6)
+    listPad.PaddingRight = UDim.new(0, 6)
+    listPad.PaddingTop = UDim.new(0, 6)
+    listPad.PaddingBottom = UDim.new(0, 6)
+    listPad.Parent = listFrame
+
+    local function rebuildList()
+        for _, c in ipairs(listFrame:GetChildren()) do
+            if c:IsA("TextButton") or c:IsA("TextLabel") then
+                c:Destroy()
+            end
+        end
+
+        local bosses = scanHalloweenBosses()
+        countLabel.Text = ("Найдено боссов: %d"):format(#bosses)
+
+        if #bosses == 0 then
+            local empty = Instance.new("TextLabel")
+            empty.Size = UDim2.new(1, 0, 0, 30)
+            empty.BackgroundTransparency = 1
+            empty.Text = "Боссов пока нет на карте"
+            empty.TextColor3 = CONFIG.textDim
+            empty.TextSize = 12
+            empty.Font = Enum.Font.Gotham
+            empty.Parent = listFrame
+            return
+        end
+
+        for _, boss in ipairs(bosses) do
+            local hum = boss:FindFirstChildOfClass("Humanoid")
+            local hp = hum and math.floor(hum.Health) or 0
+
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(1, 0, 0, 32)
+            b.BackgroundColor3 = CONFIG.cardColor
+            b.Text = ("%s   (HP %d)"):format(boss.Name, hp)
+            b.TextColor3 = CONFIG.textColor
+            b.TextSize = 12
+            b.Font = Enum.Font.GothamMedium
+            b.AutoButtonColor = false
+            b.Parent = listFrame
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+
+            b.MouseEnter:Connect(function()
+                b.BackgroundColor3 = CONFIG.cardHover
+            end)
+            b.MouseLeave:Connect(function()
+                b.BackgroundColor3 = CONFIG.cardColor
+            end)
+            b.MouseButton1Click:Connect(function()
+                halloween.selectedName = boss.Name
+                selectedBossLabel.Text = ("🎯 Цель: %s"):format(boss.Name)
+                selectedBossLabel.TextColor3 = CONFIG.green
+
+                -- Сворачиваем список
+                halloween.listExpanded = false
+                listFrame.Visible = false
+                expandBtn.Text = "📜 Развернуть список боссов"
+            end)
+        end
+    end
+
+    expandBtn.MouseButton1Click:Connect(function()
+        halloween.listExpanded = not halloween.listExpanded
+        if halloween.listExpanded then
+            rebuildList()
+            -- Высота: 36 за каждого + padding
+            local count = 0
+            for _, c in ipairs(listFrame:GetChildren()) do
+                if c:IsA("TextButton") or c:IsA("TextLabel") then
+                    count = count + 1
+                end
+            end
+            listFrame.Size = UDim2.new(1, 0, 0, math.max(36, count * 36 + 12))
+            listFrame.Visible = true
+            expandBtn.Text = "📜 Свернуть список"
+        else
+            listFrame.Visible = false
+            expandBtn.Text = "📜 Развернуть список боссов"
+        end
+    end)
+
+    -- Авто-обновление списка (если развёрнут)
+    task.spawn(function()
+        while true do
+            task.wait(2)
+            if halloween.listExpanded then
+                rebuildList()
+                local count = 0
+                for _, c in ipairs(listFrame:GetChildren()) do
+                    if c:IsA("TextButton") or c:IsA("TextLabel") then
+                        count = count + 1
+                    end
+                end
+                listFrame.Size = UDim2.new(1, 0, 0, math.max(36, count * 36 + 12))
+            else
+                -- Обновляем счётчик
+                local bosses = scanHalloweenBosses()
+                countLabel.Text = ("Найдено боссов: %d"):format(#bosses)
+            end
+        end
+    end)
+
+    -------------------------------------------------------------
+    -- Тумблеры
+    -------------------------------------------------------------
+    makeToggleRow(scroll9, "Атаковать выбранного", false, function(on)
+        if on and not halloween.selectedName then
+            selectedBossLabel.Text = "🎯 Цель: не выбрана"
+            selectedBossLabel.TextColor3 = CONFIG.red
+            halloweenStatus.Text = "Статус: выбери босса в списке"
+            halloweenStatus.TextColor3 = CONFIG.red
+            return
+        end
+
+        halloween.running = on
+        if not on then
+            halloweenStatus.Text = "Статус: остановлено"
+            halloweenStatus.TextColor3 = CONFIG.orange
+            return
+        end
+
+        halloweenStatus.Text = "Статус: атака..."
+        halloweenStatus.TextColor3 = CONFIG.green
+
+        task.spawn(function()
+            while halloween.running do
+                local myChar = player.Character
+                local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                if not myHRP then task.wait(0.2); continue end
+
+                local boss = halloween.lockedBoss
+
+                -- Перепроверяем босса
+                if not isAliveModel(boss) or (boss and boss.Name ~= halloween.selectedName) then
+                    halloween.lockedBoss = nil
+                    boss = findByName(halloween.selectedName)
+                    if boss then
+                        halloween.lockedBoss = boss
+                    end
+                end
+
+                if boss and isAliveModel(boss) then
+                    for _ = 1, 20 do
+                        if not halloween.running then break end
+                        if not isAliveModel(boss) then break end
+                        attackBoss(boss)
+                        task.wait(0.02)
+                    end
+                else
+                    task.wait(0.3)
+                end
+
+                task.wait(0.02)
+            end
+        end)
+    end)
+
+    makeToggleRow(scroll9, "Атаковать ближайшего (Halloween)", false, function(on)
+        halloween.nearestMode = on
+        if not on then return end
+
+        halloweenStatus.Text = "Статус: ищу ближайшего..."
+        halloweenStatus.TextColor3 = CONFIG.green
+
+        task.spawn(function()
+            while halloween.nearestMode do
+                local myChar = player.Character
+                local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                if not myHRP then task.wait(0.2); continue end
+
+                local bosses = scanHalloweenBosses()
+                local boss = findNearest(bosses)
+
+                if boss then
+                    selectedBossLabel.Text = ("🎯 Ближайший: %s"):format(boss.Name)
+                    selectedBossLabel.TextColor3 = CONFIG.green
+
+                    for _ = 1, 20 do
+                        if not halloween.nearestMode then break end
+                        if not isAliveModel(boss) then break end
+                        attackBoss(boss)
+                        task.wait(0.02)
+                    end
+                else
+                    halloweenStatus.Text = "Статус: боссов нет"
+                    halloweenStatus.TextColor3 = CONFIG.textDim
+                    task.wait(0.5)
+                end
+
+                task.wait(0.05)
+            end
+        end)
+    end)
+
+    makeActionRow(scroll9, "🚫 Сбросить цель", Color3.fromRGB(90, 45, 55), function()
+        halloween.selectedName = nil
+        halloween.lockedBoss = nil
+        halloween.running = false
+        halloween.nearestMode = false
+        selectedBossLabel.Text = "🎯 Цель: не выбрана"
+        selectedBossLabel.TextColor3 = CONFIG.orange
+        halloweenStatus.Text = "Статус: ожидание"
+        halloweenStatus.TextColor3 = CONFIG.textDim
+    end)
+
+    -------------------------------------------------------------
+    -- Обновление статуса в реальном времени
+    -------------------------------------------------------------
+    task.spawn(function()
+        while true do
+            if halloween.lockedBoss and halloween.lockedBoss.Parent then
+                local hum = halloween.lockedBoss:FindFirstChildOfClass("Humanoid")
+                local hp = hum and math.floor(hum.Health) or 0
+                halloweenStatus.Text = ("🎯 %s (HP %d)"):format(halloween.lockedBoss.Name, hp)
+                halloweenStatus.TextColor3 = CONFIG.green
+            end
+            task.wait(0.5)
+        end
+    end)
+
+    print("[Halloween] Вкладка загружена. Впиши имена боссов в HALLOWEEN_BOSSES.")
+end)
