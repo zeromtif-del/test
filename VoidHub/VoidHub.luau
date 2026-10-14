@@ -1675,20 +1675,17 @@ end)
 --  🤖 ВКЛАДКА 6 — АВТО
 --==============================================================
 --==============================================================
---  👑 AUTO BOSS — полная версия
+--  👑 AUTO BOSS — атака + сбор Workspace.BossChest
 --==============================================================
 makeSectionHeader(scroll6, "👑 Auto Boss")
 
 local bossData = {
     running = false,
-    autoChest = false,
     lockedBoss = nil,
 }
 
-_G.__VH_BOSS_STATE = bossData
-
 ---------------------------------------------------------------
--- Папка BossArena
+-- BossArena
 ---------------------------------------------------------------
 local function getBossArena()
     local ev = workspace:FindFirstChild("Events")
@@ -1697,14 +1694,18 @@ local function getBossArena()
 end
 
 ---------------------------------------------------------------
--- Проверка: это живой босс с "Boss" в имени?
+-- Проверка: живой босс с "Boss" в имени?
 ---------------------------------------------------------------
+local function getBossPart(m)
+    return m:FindFirstChild("HumanoidRootPart")
+        or m:FindFirstChildWhichIsA("BasePart", true)
+end
+
 local function isAliveBoss(d)
     if not d or not d.Parent or not d:IsA("Model") then return false end
     if not string.find(d.Name:lower(), "boss", 1, true) then return false end
 
-    local part = d:FindFirstChild("HumanoidRootPart")
-        or d:FindFirstChildWhichIsA("BasePart", true)
+    local part = getBossPart(d)
     if not part then return false end
 
     local hum = d:FindFirstChildOfClass("Humanoid")
@@ -1717,7 +1718,7 @@ local function isAliveBoss(d)
 end
 
 ---------------------------------------------------------------
--- Поиск ближайшего босса
+-- Поиск ближайшего живого босса
 ---------------------------------------------------------------
 local function findBoss()
     local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -1728,8 +1729,7 @@ local function findBoss()
     local function scan(root)
         for _, d in ipairs(root:GetChildren()) do
             if isAliveBoss(d) then
-                local part = d:FindFirstChild("HumanoidRootPart")
-                    or d:FindFirstChildWhichIsA("BasePart", true)
+                local part = getBossPart(d)
                 if part then
                     local dist = (part.Position - myHRP.Position).Magnitude
                     if dist < bestDist then
@@ -1748,13 +1748,12 @@ local function findBoss()
 end
 
 ---------------------------------------------------------------
--- Удар по боссу
+-- Атака босса
 ---------------------------------------------------------------
 local function attackBoss(boss)
     if not boss or not boss.Parent then return end
 
-    local part = boss:FindFirstChild("HumanoidRootPart")
-        or boss:FindFirstChildWhichIsA("BasePart", true)
+    local part = getBossPart(boss)
     if not part then return end
 
     local hum = boss:FindFirstChildOfClass("Humanoid")
@@ -1764,7 +1763,6 @@ local function attackBoss(boss)
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not myHRP then return end
 
-    -- Авто-экип Punch
     if not myChar:FindFirstChild("Punch") then
         local bp = player:FindFirstChild("Backpack")
         local tool = bp and bp:FindFirstChild("Punch")
@@ -1774,12 +1772,10 @@ local function attackBoss(boss)
         end
     end
 
-    -- Телепорт вплотную
     myHRP.CFrame = CFrame.new(part.Position + Vector3.new(0, 3, 0), part.Position)
     myHRP.AssemblyLinearVelocity = Vector3.zero
     myHRP.AssemblyAngularVelocity = Vector3.zero
 
-    -- Удары
     pcall(function()
         local lh = myChar:FindFirstChild("LeftHand")
         local rh = myChar:FindFirstChild("RightHand")
@@ -1797,29 +1793,153 @@ local function attackBoss(boss)
 end
 
 ---------------------------------------------------------------
--- Сбор сундуков
+-- 🎁 BOSS CHEST — только Workspace.BossChest
 ---------------------------------------------------------------
-local function collectChest()
-    local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return end
-    for _, d in ipairs(workspace:GetDescendants()) do
-        if d:IsA("BasePart") or d:IsA("Model") then
-            local name = d.Name:lower()
-            if string.find(name, "chest", 1, true)
-                or string.find(name, "reward", 1, true)
-                or string.find(name, "loot", 1, true) then
-                local part = d:IsA("BasePart") and d or d:FindFirstChildWhichIsA("BasePart")
-                if part then
-                    myHRP.CFrame = CFrame.new(part.Position + Vector3.new(0, 3, 0))
-                    task.wait(0.05)
-                    pcall(function()
-                        firetouchinterest(part, myHRP, 0)
-                        firetouchinterest(part, myHRP, 1)
-                    end)
+local function getBossChest()
+    return workspace:FindFirstChild("BossChest")
+end
+
+local function pressE()
+    local VIM = game:GetService("VirtualInputManager")
+    pcall(function()
+        VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0.08)
+        VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    end)
+end
+
+---------------------------------------------------------------
+-- Собрать все Attachment + ProximityPrompt внутри BossChest
+---------------------------------------------------------------
+local function gatherPromptsAndAttachments(root)
+    local prompts = {}
+    local attachments = {}
+    for _, d in ipairs(root:GetDescendants()) do
+        if d:IsA("ProximityPrompt") then
+            table.insert(prompts, d)
+        elseif d:IsA("Attachment") then
+            table.insert(attachments, d)
+            -- ProximityPrompt может быть внутри Attachment
+            for _, ch in ipairs(d:GetChildren()) do
+                if ch:IsA("ProximityPrompt") then
+                    table.insert(prompts, ch)
                 end
             end
         end
     end
+    return prompts, attachments
+end
+
+---------------------------------------------------------------
+-- Открытие BossChest
+---------------------------------------------------------------
+local function tryOpenChest(chest)
+    if not chest or not chest.Parent then return false end
+
+    local myChar = player.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return false end
+
+    -- Найти prompts и attachments
+    local prompts, attachments = gatherPromptsAndAttachments(chest)
+
+    -- Определить точку телепорта: первый Attachment или часть
+    local targetPos = nil
+    if #attachments > 0 and attachments[1].WorldPosition then
+        targetPos = attachments[1].WorldPosition
+    else
+        local part = chest:FindFirstChildWhichIsA("BasePart", true)
+        if part then targetPos = part.Position end
+    end
+    if not targetPos then return false end
+
+    -- Телепорт прямо в точку prompt
+    myHRP.CFrame = CFrame.new(targetPos + Vector3.new(0, 1.5, 0))
+    myHRP.AssemblyLinearVelocity = Vector3.zero
+    myHRP.AssemblyAngularVelocity = Vector3.zero
+    task.wait(0.25)
+
+    -- Корректировка
+    myHRP.CFrame = CFrame.new(targetPos + Vector3.new(0, 1.5, 0))
+    task.wait(0.1)
+
+    -- === Активация ProximityPrompt ===
+    for _, prompt in ipairs(prompts) do
+        pcall(function()
+            prompt.MaxActivationDistance = math.max(prompt.MaxActivationDistance or 0, 50)
+            if prompt.Enabled == false then prompt.Enabled = true end
+        end)
+
+        -- fireproximityprompt (executor)
+        pcall(function()
+            if fireproximityprompt then
+                fireproximityprompt(prompt, 0)
+            end
+        end)
+
+        -- InputHoldBegin/End (встроенный Roblox)
+        pcall(function()
+            prompt:InputHoldBegin()
+            task.wait(prompt.HoldDuration or 0.1)
+            prompt:InputHoldEnd()
+        end)
+
+        task.wait(0.1)
+    end
+
+    -- === Touch по всем BasePart ===
+    pcall(function()
+        local lh = myChar:FindFirstChild("LeftHand")
+        local rh = myChar:FindFirstChild("RightHand")
+        for _, d in ipairs(chest:GetDescendants()) do
+            if d:IsA("BasePart") then
+                firetouchinterest(d, myHRP, 0)
+                firetouchinterest(d, myHRP, 1)
+                if lh then
+                    firetouchinterest(d, lh, 0)
+                    firetouchinterest(d, lh, 1)
+                end
+                if rh then
+                    firetouchinterest(d, rh, 0)
+                    firetouchinterest(d, rh, 1)
+                end
+            end
+        end
+    end)
+
+    -- === ClickDetector ===
+    pcall(function()
+        for _, d in ipairs(chest:GetDescendants()) do
+            if d:IsA("ClickDetector") and fireclickdetector then
+                fireclickdetector(d)
+            end
+        end
+    end)
+
+    -- === E несколько раз ===
+    pressE()
+    task.wait(0.12)
+    pressE()
+    task.wait(0.12)
+    pressE()
+
+    return true
+end
+
+local function collectBossChest()
+    local chest = getBossChest()
+    if not chest then return false end
+
+    local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return false end
+
+    for _ = 1, 5 do
+        if not chest or not chest.Parent then break end
+        tryOpenChest(chest)
+        task.wait(0.2)
+    end
+
+    return true
 end
 
 ---------------------------------------------------------------
@@ -1833,16 +1953,12 @@ makeToggleRow(scroll6, "Auto Boss", false, function(on)
     if on then
         bossData.lockedBoss = nil
 
-        -- Воркер
+        -- Воркер атаки
         task.spawn(function()
-            while bossData.running do
+            while bossData.running and _G.__VH_GEN == MY_GEN do
                 local myChar = player.Character
                 local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-
-                if not myHRP then
-                    task.wait(0.2)
-                    continue
-                end
+                if not myHRP then task.wait(0.2); continue end
 
                 local boss = bossData.lockedBoss
 
@@ -1860,17 +1976,36 @@ makeToggleRow(scroll6, "Auto Boss", false, function(on)
                         if not bossData.running then break end
                         if not isAliveBoss(boss) then break end
                         attackBoss(boss)
-                        task.wait(0.02)
+                        task.wait(0.03)
                     end
                 else
-                    task.wait(0.3)
+                    task.wait(0.5)
                 end
 
-                task.wait(0.02)
+                -- Если босс мёртв — ждём BossChest и собираем
+                if boss and not isAliveBoss(boss) then
+                    local waitStart = tick()
+                    while tick() - waitStart < 5 do
+                        if getBossChest() then break end
+                        if not bossData.running then break end
+                        task.wait(0.1)
+                    end
+
+                    for _ = 1, 6 do
+                        if not getBossChest() then break end
+                        if not bossData.running then break end
+                        collectBossChest()
+                        task.wait(0.4)
+                    end
+
+                    bossData.lockedBoss = nil
+                end
+
+                task.wait(0.05)
             end
         end)
 
-        -- Обновление статуса
+        -- Статус
         task.spawn(function()
             while bossData.running and _G.__VH_GEN == MY_GEN do
                 if bossData.lockedBoss and bossData.lockedBoss.Parent then
@@ -1879,6 +2014,9 @@ makeToggleRow(scroll6, "Auto Boss", false, function(on)
                     bossStatus.Text = ("🎯 %s (HP %d)"):format(
                         bossData.lockedBoss.Name, math.floor(hp))
                     bossStatus.TextColor3 = CONFIG.green
+                elseif getBossChest() then
+                    bossStatus.Text = "🎁 Собираю BossChest..."
+                    bossStatus.TextColor3 = CONFIG.orange
                 else
                     local arena = getBossArena()
                     local count = 0
@@ -1892,23 +2030,9 @@ makeToggleRow(scroll6, "Auto Boss", false, function(on)
                 end
                 task.wait(0.5)
             end
-            bossStatus.Text = "Босс: —"
-            bossStatus.TextColor3 = CONFIG.textDim
         end)
     else
         bossData.lockedBoss = nil
-    end
-end)
-
-makeToggleRow(scroll6, "Auto Collect Chest", false, function(on)
-    bossData.autoChest = on
-    if on then
-        task.spawn(function()
-            while bossData.autoChest do
-                pcall(collectChest)
-                task.wait(0.5)
-            end
-        end)
     end
 end)
 
