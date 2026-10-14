@@ -1701,9 +1701,23 @@ local function getBossPart(m)
         or m:FindFirstChildWhichIsA("BasePart", true)
 end
 
+---------------------------------------------------------------
+-- 🎯 Whitelist боссов (точные имена)
+---------------------------------------------------------------
+local BOSS_WHITELIST = {
+    ["Boss1"]       = true,
+    ["Boss2"]       = true,
+    ["Boss3"]       = true,
+    ["Boss4"]       = true,
+    ["Boss5"]       = true,
+    ["BossRainbow"] = true,
+}
+
 local function isAliveBoss(d)
     if not d or not d.Parent or not d:IsA("Model") then return false end
-    if not string.find(d.Name:lower(), "boss", 1, true) then return false end
+
+    -- 🔒 Только из whitelist (RefreshBoss и прочие игнорируем)
+    if not BOSS_WHITELIST[d.Name] then return false end
 
     local part = getBossPart(d)
     if not part then return false end
@@ -1724,25 +1738,22 @@ local function findBoss()
     local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
     if not myHRP then return nil end
 
+    local arena = getBossArena()
+    if not arena then return nil end   -- 🔒 ищем ТОЛЬКО в BossArena
+
     local best, bestDist = nil, math.huge
 
-    local function scan(root)
-        for _, d in ipairs(root:GetChildren()) do
-            if isAliveBoss(d) then
-                local part = getBossPart(d)
-                if part then
-                    local dist = (part.Position - myHRP.Position).Magnitude
-                    if dist < bestDist then
-                        best, bestDist = d, dist
-                    end
+    for _, d in ipairs(arena:GetChildren()) do
+        if isAliveBoss(d) then
+            local part = getBossPart(d)
+            if part then
+                local dist = (part.Position - myHRP.Position).Magnitude
+                if dist < bestDist then
+                    best, bestDist = d, dist
                 end
             end
         end
     end
-
-    local arena = getBossArena()
-    if arena then scan(arena) end
-    if not best then scan(workspace) end
 
     return best
 end
@@ -2033,6 +2044,145 @@ makeToggleRow(scroll6, "Auto Boss", false, function(on)
         end)
     else
         bossData.lockedBoss = nil
+    end
+end)
+
+--==============================================================
+--  🎁 AUTO CHEST COLLECTOR
+--  Ищет модели с "chest" в имени среди детей Workspace,
+--  находит внутри circleInner, телепортится и жмёт touch.
+--==============================================================
+makeSectionHeader(scroll6, "🎁 Auto Chest Collector")
+
+local chestCollectorRunning = false
+
+---------------------------------------------------------------
+-- Найти circleInner внутри модели
+---------------------------------------------------------------
+local function findCircleInner(model)
+    for _, d in ipairs(model:GetDescendants()) do
+        if d:IsA("BasePart") and string.find(d.Name:lower(), "circleinner", 1, true) then
+            return d
+        end
+    end
+    return nil
+end
+
+---------------------------------------------------------------
+-- Собрать все цели: прямые дети Workspace с "chest" в имени
+---------------------------------------------------------------
+local function gatherTargets()
+    local result = {}
+    for _, d in ipairs(workspace:GetChildren()) do
+        if d:IsA("Model") and string.find(d.Name:lower(), "chest", 1, true) then
+            local circle = findCircleInner(d)
+            if circle then
+                table.insert(result, {
+                    model = d,
+                    part = circle,
+                })
+            end
+        end
+    end
+    return result
+end
+
+---------------------------------------------------------------
+-- Открыть один сундук через touch к circleInner
+---------------------------------------------------------------
+local function openChestByTouch(entry)
+    if not entry or not entry.part or not entry.part.Parent then return false end
+
+    local myChar = player.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return false end
+
+    local target = entry.part
+
+    -- Телепорт прямо на circleInner
+    myHRP.CFrame = CFrame.new(target.Position + Vector3.new(0, 1, 0), target.Position)
+    myHRP.AssemblyLinearVelocity = Vector3.zero
+    myHRP.AssemblyAngularVelocity = Vector3.zero
+    task.wait(0.15)
+
+    -- Touch: HRP + LeftHand + RightHand по circleInner
+    pcall(function()
+        local lh = myChar:FindFirstChild("LeftHand")
+        local rh = myChar:FindFirstChild("RightHand")
+
+        firetouchinterest(target, myHRP, 0)
+        firetouchinterest(target, myHRP, 1)
+
+        if lh then
+            firetouchinterest(target, lh, 0)
+            firetouchinterest(target, lh, 1)
+        end
+        if rh then
+            firetouchinterest(target, rh, 0)
+            firetouchinterest(target, rh, 1)
+        end
+    end)
+
+    return true
+end
+
+---------------------------------------------------------------
+-- Основной проход — по одному сундуку
+---------------------------------------------------------------
+local function runCollector()
+    local list = gatherTargets()
+    for _, entry in ipairs(list) do
+        if not chestCollectorRunning then break end
+        if not entry.part or not entry.part.Parent then continue end
+
+        openChestByTouch(entry)
+        task.wait(0.2)
+
+        -- Ещё раз touch на всякий случай
+        if entry.part and entry.part.Parent then
+            openChestByTouch(entry)
+            task.wait(0.15)
+        end
+    end
+end
+
+---------------------------------------------------------------
+-- Статус
+---------------------------------------------------------------
+local chestCollectorStatus = makeInfoLabel(scroll6, "🎁 Статус: ожидание", CONFIG.textDim)
+
+---------------------------------------------------------------
+-- Тумблер
+---------------------------------------------------------------
+makeToggleRow(scroll6, "Auto Chest Collector", false, function(on)
+    chestCollectorRunning = on
+
+    if on then
+        chestCollectorStatus.Text = "🎁 Статус: ищу сундуки..."
+        chestCollectorStatus.TextColor3 = CONFIG.green
+
+        task.spawn(function()
+            while chestCollectorRunning and _G.__VH_GEN == MY_GEN do
+                local list = gatherTargets()
+
+                if #list > 0 then
+                    chestCollectorStatus.Text = ("🎁 Найдено: %d"):format(#list)
+                    chestCollectorStatus.TextColor3 = CONFIG.green
+                    pcall(runCollector)
+                else
+                    chestCollectorStatus.Text = "🎁 Сундуков нет"
+                    chestCollectorStatus.TextColor3 = CONFIG.textDim
+                end
+
+                task.wait(0.8)
+            end
+
+            chestCollectorStatus.Text = "🎁 Статус: остановлено"
+            chestCollectorStatus.TextColor3 = CONFIG.orange
+        end)
+    else
+        chestCollectorStatus.Text = "🎁 Статус: остановлено"
+        chestCollectorStatus.TextColor3 = CONFIG.orange
     end
 end)
 
