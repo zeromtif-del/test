@@ -3,6 +3,102 @@
 --  Дизайн в стиле MUSCLE HUB, все вкладки слева, статы справа
 --==============================================================
 
+--==============================================================
+--  🧹 АВТО-ОЧИСТКА СТАРОГО ПРОЦЕССА
+--  Каждый запуск убивает предыдущую версию скрипта
+--==============================================================
+_G.__VH_GEN = (_G.__VH_GEN or 0) + 1
+local MY_GEN = _G.__VH_GEN
+
+do
+    local Players = game:GetService("Players")
+    local plr = Players.LocalPlayer
+
+    -- 1) Уничтожаем старые ScreenGui
+    local pg = plr:FindFirstChild("PlayerGui")
+    if pg then
+        for _, gui in ipairs(pg:GetChildren()) do
+            if gui.Name == "VoidHub"
+                or gui.Name == "TeleportMenuGui"
+                or gui.Name == "TP_InputPrompt" then
+                pcall(function() gui:Destroy() end)
+            end
+        end
+    end
+
+    -- 2) Отключаем старые коннекты, если они сохранены
+    if _G.__VH_CONNS then
+        for _, c in ipairs(_G.__VH_CONNS) do
+            pcall(function() c:Disconnect() end)
+        end
+    end
+    _G.__VH_CONNS = {}
+
+    -- 3) Отключаем старые InputChanged / InputEnded от drag
+    if _G.__VH_DRAG_CONNS then
+        for _, c in ipairs(_G.__VH_DRAG_CONNS) do
+            pcall(function() c:Disconnect() end)
+        end
+    end
+    _G.__VH_DRAG_CONNS = {}
+
+    -- 4) Сбрасываем флаги всех режимов старых скриптов
+    _G.KillEveryone      = false
+    _G.InfiniteJump      = false
+    _G.AutoHatchPet      = false
+    _G.AutoHatchAura     = false
+    _G.RockFarmRunning   = false
+    _G.WhitelistFriends  = false
+
+    -- 5) Останавливаем старые машины/воркеры
+    if _G.__VH_REP_STATE then
+        _G.__VH_REP_STATE.running = false
+        _G.__VH_REP_STATE.simpleMode = false
+    end
+    if _G.__VH_REBIRTH_STATE then
+        _G.__VH_REBIRTH_STATE.running = false
+    end
+    if _G.__VH_BOSS_STATE then
+        _G.__VH_BOSS_STATE.running = false
+    end
+    if _G.__VH_HALLOWEEN_STATE then
+        _G.__VH_HALLOWEEN_STATE.running = false
+        _G.__VH_HALLOWEEN_STATE.nearestMode = false
+    end
+    if _G.__VH_HOP_STATE then
+        _G.__VH_HOP_STATE.running = false
+    end
+    if _G.__VH_MACHINE_DATA then
+        for _, data in pairs(_G.__VH_MACHINE_DATA) do
+            data.running = false
+        end
+    end
+
+    -- 6) Убираем AntiFling
+    local char = plr.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if hrp and hrp:FindFirstChild("AntiFlingBV") then
+        pcall(function() hrp.AntiFlingBV:Destroy() end)
+    end
+
+    -- 7) Убираем Walk on Water parts
+    for _, p in ipairs(workspace:GetChildren()) do
+        if p:IsA("Part") and p.Anchored and p.Transparency == 1 then
+            if p.Size == Vector3.new(2048, 1, 2048) then
+                pcall(function() p:Destroy() end)
+            end
+        end
+    end
+
+    -- 8) Возвращаем FOV
+    if workspace.CurrentCamera then
+        workspace.CurrentCamera.FieldOfView = 70
+    end
+
+    print(("[Void Hub] Старый процесс убит. Запуск генерации #%d"):format(MY_GEN))
+end
+--==============================================================
+
 local Players          = game:GetService("Players")
 local TweenService     = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
@@ -943,7 +1039,7 @@ local function startRepWorker()
     repState.startStrength = farm.strength.Value
 
     repWorker = task.spawn(function()
-        while repState.running do
+        while repState.running and _G.__VH_GEN == MY_GEN do
             local now = os.clock()
             local dt = math.min(0.1, now - repState.lastLoop)
             repState.lastLoop = now
@@ -1032,6 +1128,8 @@ makeSectionHeader(scroll3, "♻️ Fast Rebirth")
 
 local rebirthState = { running = false, workerActive = false }
 
+_G.__VH_REBIRTH_STATE = rebirthState
+
 local function doOneRebirth()
     local wasRunning = repState.running
     if not wasRunning then
@@ -1063,7 +1161,7 @@ local function startRebirthWorker()
     if rebirthState.workerActive then return end
     rebirthState.workerActive = true
     task.spawn(function()
-        while rebirthState.running do
+        while rebirthState.running and _G.__VH_GEN == MY_GEN do
             doOneRebirth()
             task.wait(0.5)
         end
@@ -1102,7 +1200,7 @@ end)
 
 -- Farm stats update
 task.spawn(function()
-    while true do
+    while _G.__VH_GEN == MY_GEN do
         if farm.ready then
             statsLabel.Text = ("Strength: %s | Rebirths: %s"):format(
                 tostring(math.floor(farm.strength.Value)),
@@ -1227,8 +1325,8 @@ makeActionRow(scroll4, "☀️ День", Color3.fromRGB(120, 100, 40), function
 
 local fortuneWheelRunning = false
 task.spawn(function()
-    while true do
-        if fortuneWheelRunning then
+    while _G.__VH_GEN == MY_GEN do
+    if fortuneWheelRunning then
             pcall(function()
                 local rEvents = ReplicatedStorage:FindFirstChild("rEvents")
                 local remote = rEvents and rEvents:FindFirstChild("openFortuneWheelRemote")
@@ -1435,7 +1533,7 @@ makeToggleRow(scroll5, "Target Kill (по всей карте)", false, function
     if on then
         selectedLabel.TextColor3 = CONFIG.green
         task.spawn(function()
-            while targetKillRunning do
+            while targetKillRunning and _G.__VH_GEN == MY_GEN do
                 local t = targetKillPlayer
                 if t and t.Parent and t.Character then
                     if isAlive(t) and not isProtected(t) and not isWhitelisted(t) then
@@ -1476,7 +1574,7 @@ makeToggleRow(scroll5, "Kill Aura (в радиусе)", false, function(on)
     killAuraRunning = on
     if not on then return end
     task.spawn(function()
-        while killAuraRunning do
+        while killAuraRunning and _G.__VH_GEN == MY_GEN do
             local myChar = player.Character
             local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
             if not myHRP then task.wait(0.2); continue end
@@ -1505,7 +1603,7 @@ makeToggleRow(scroll5, "Kill Everyone", false, function(on)
     if not on then return end
     task.spawn(function()
         local idx = 1
-        while _G.KillEveryone do
+        while _G.KillEveryone and _G.__VH_GEN == MY_GEN do
             local targets = {}
             for _, other in ipairs(Players:GetPlayers()) do
                 if other ~= player and isAlive(other) and not isProtected(other) then
@@ -1534,6 +1632,8 @@ local bossData = {
     autoChest = false,
     lockedBoss = nil,
 }
+
+_G.__VH_BOSS_STATE = bossData
 
 ---------------------------------------------------------------
 -- Папка BossArena
@@ -1720,7 +1820,7 @@ makeToggleRow(scroll6, "Auto Boss", false, function(on)
 
         -- Обновление статуса
         task.spawn(function()
-            while bossData.running do
+            while bossData.running and _G.__VH_GEN == MY_GEN do
                 if bossData.lockedBoss and bossData.lockedBoss.Parent then
                     local hum = bossData.lockedBoss:FindFirstChildOfClass("Humanoid")
                     local hp = hum and hum.Health or 0
@@ -1814,6 +1914,8 @@ local machineData = {
     Lift = { selected = nil, running = false, active = nil },
 }
 
+_G.__VH_MACHINE_DATA = machineData
+
 local squatNames, liftNames = {}, {}
 if machinesFolder then
     for _, m in ipairs(machinesFolder:GetChildren()) do
@@ -1829,7 +1931,7 @@ end
 local function runMachine(data)
     data.running = true
     task.spawn(function()
-        while data.running do
+        while data.running and _G.__VH_GEN == MY_GEN do
             if data.selected and not data.active then
                 if MachineHelper.enter(data.selected) then
                     data.active = data.selected
@@ -1874,7 +1976,7 @@ makeToggleRow(scroll7, "Eat All Eggs", false, function(on)
     eggEaterRunning = on
     if on then
         task.spawn(function()
-            while eggEaterRunning do
+            while eggEaterRunning and _G.__VH_GEN == MY_GEN do
                 local tool = (player.Character and player.Character:FindFirstChild("Protein Egg"))
                     or player.Backpack:FindFirstChild("Protein Egg")
                 if tool then pcall(function() player.muscleEvent:FireServer("proteinEgg", tool) end) end
@@ -1890,7 +1992,7 @@ makeToggleRow(scroll7, "Eat All Boosts (лаг)", false, function(on)
     boostRunning = on
     if on then
         task.spawn(function()
-            while boostRunning do
+            while boostRunning and _G.__VH_GEN == MY_GEN do
                 for _, name in ipairs(boostList) do
                     local tool = (player.Character and player.Character:FindFirstChild(name))
                         or player.Backpack:FindFirstChild(name)
@@ -1940,7 +2042,7 @@ makeToggleRow(scroll7, "Buy Pet", false, function(on)
     buyPetRunning = on
     if on then
         task.spawn(function()
-            while buyPetRunning do
+            while buyPetRunning and _G.__VH_GEN == MY_GEN do
                 if selectedPet and petShopFolder and petShopRemote then
                     local pet = petShopFolder:FindFirstChild(selectedPet)
                     if pet then pcall(function() petShopRemote:InvokeServer(pet) end) end
@@ -1956,7 +2058,7 @@ makeToggleRow(scroll7, "Auto Evolve", false, function(on)
     evolveRunning = on
     if on then
         task.spawn(function()
-            while evolveRunning do
+            while evolveRunning and _G.__VH_GEN == MY_GEN do
                 if selectedPet then
                     pcall(function()
                         ReplicatedStorage.rEvents.petEvolveEvent:FireServer("evolvePet", selectedPet)
@@ -2161,7 +2263,7 @@ end)
 
 -- Обновление статов
 task.spawn(function()
-    while true do
+    while _G.__VH_GEN == MY_GEN do
         pcall(function()
             local ls = player:FindFirstChild("leaderstats")
             local str = ls and ls:FindFirstChild("Strength")
@@ -2317,6 +2419,8 @@ task.defer(function()
         selectedName = nil,
         listExpanded = false,
     }
+
+_G.__VH_HALLOWEEN_STATE = halloween
 
     -------------------------------------------------------------
     -- Проверки
@@ -2625,7 +2729,7 @@ task.defer(function()
         halloweenStatus.TextColor3 = CONFIG.green
 
         task.spawn(function()
-            while halloween.running do
+            while halloween.running and _G.__VH_GEN == MY_GEN do
                 local myChar = player.Character
                 local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
                 if not myHRP then task.wait(0.2); continue end
@@ -2665,7 +2769,7 @@ task.defer(function()
         halloweenStatus.TextColor3 = CONFIG.green
 
         task.spawn(function()
-            while halloween.nearestMode do
+            while halloween.nearestMode and _G.__VH_GEN == MY_GEN do
                 local myChar = player.Character
                 local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
                 if not myHRP then task.wait(0.2); continue end
