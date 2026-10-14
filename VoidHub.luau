@@ -1028,6 +1028,54 @@ local repState = {
 }
 _G.__repState = repState
 
+--==============================================================
+--  Проверка инструмента (нужно для startRepWorker)
+--==============================================================
+local EXERCISE_TOOLS = {
+    ["Weight"] = true,
+    ["Dumbbell"] = true,
+    ["Barbell"] = true,
+    ["Pushups"] = true,
+    ["Situps"] = true,
+    ["Handstands"] = true,
+    ["Bench Press"] = true,
+    ["Deadlift"] = true,
+}
+
+local function hasExerciseTool()
+    local char = player.Character
+    if not char then return false end
+    for _, obj in ipairs(char:GetChildren()) do
+        if obj:IsA("Tool") and EXERCISE_TOOLS[obj.Name] then
+            return true
+        end
+    end
+    return false
+end
+
+local function ensureExerciseToolEquipped()
+    if hasExerciseTool() then return true end
+    local bp = player:FindFirstChild("Backpack")
+    if not bp then return false end
+    for _, tool in ipairs(bp:GetChildren()) do
+        if tool:IsA("Tool") and EXERCISE_TOOLS[tool.Name] then
+            local char = player.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                pcall(function() hum:EquipTool(tool) end)
+                return true
+            end
+        end
+    end
+    return false
+end
+
+--==============================================================
+--  Fast Rep worker
+--==============================================================
+local repWorker = nil
+local function startRepWorker()
+
 local repWorker = nil
 local function startRepWorker()
     if repWorker then return end
