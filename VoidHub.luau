@@ -1029,7 +1029,7 @@ local repState = {
 _G.__repState = repState
 
 --==============================================================
---  Проверка инструмента (нужно для startRepWorker)
+--  Fast Rep — ВСЁ В ОДНОМ (без внешних зависимостей)
 --==============================================================
 local EXERCISE_TOOLS = {
     ["Weight"] = true,
@@ -1070,13 +1070,17 @@ local function ensureExerciseToolEquipped()
     return false
 end
 
---==============================================================
---  Fast Rep worker
---==============================================================
 local repWorker = nil
-local function startRepWorker()
 
-local repWorker = nil
+local function stopRepWorker()
+    repState.running = false
+    repState.simpleMode = false
+    if repWorker then
+        pcall(function() task.cancel(repWorker) end)
+        repWorker = nil
+    end
+end
+
 local function startRepWorker()
     if repWorker then return end
     repState.lastLoop = os.clock()
@@ -1092,6 +1096,7 @@ local function startRepWorker()
             local dt = math.min(0.1, now - repState.lastLoop)
             repState.lastLoop = now
 
+            -- Адаптивный контроль скорости
             if tick() - repState.lastControlAt >= 0.5 then
                 local progressed = farm.strength.Value > repState.lastStrength
                 if progressed then
@@ -1113,18 +1118,22 @@ local function startRepWorker()
                 repState.lastStrength = farm.strength.Value
             end
 
-            -- ============ БЁРСТ + ПАУЗА ============
+            -- Проверка / авто-надевание инструмента
+            if not hasExerciseTool() then
+                ensureExerciseToolEquipped()
+            end
+
             if hasExerciseTool() then
-                -- За 0.25 сек отправляем нужное количество reps
+                -- Бёрст + пауза (без десинка)
                 local burstCount = math.floor(repState.sendRate * 0.25)
                 burstCount = math.clamp(burstCount, 10, 200)
 
                 for i = 1, burstCount do
                     if not repState.running then break end
                     if not hasExerciseTool() then break end
+
                     farm.muscleEvent:FireServer("rep")
 
-                    -- Каждые 20 reps — мини-пауза, чтобы очередь разгружалась
                     if i % 20 == 0 then
                         task.wait()
                     end
@@ -1133,7 +1142,6 @@ local function startRepWorker()
                 statusLabel.Text = ("Status: Фарм | %.0f reps/s"):format(repState.sendRate)
                 statusLabel.TextColor3 = CONFIG.green
 
-                -- 🔥 Пауза 0.25 сек → сервер успевает обработать очередь
                 task.wait(0.25)
             else
                 repState.tokens = 0
@@ -1159,13 +1167,15 @@ makeToggleRow(scroll3, "Fast Rep (Main)", false, function(on)
         statusLabel.TextColor3 = CONFIG.red
         return
     end
-    repState.running = on
+
     if on then
+        stopRepWorker()
+        repState.running = true
         startRepWorker()
         statusLabel.Text = "Status: Фарм запущен"
         statusLabel.TextColor3 = CONFIG.green
     else
-        repState.running = false
+        stopRepWorker()
         statusLabel.Text = "Status: Остановлено"
         statusLabel.TextColor3 = CONFIG.orange
     end
