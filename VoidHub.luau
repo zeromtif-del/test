@@ -1065,15 +1065,34 @@ local function startRepWorker()
                 repState.lastStrength = farm.strength.Value
             end
 
-            repState.tokens = math.min(512, repState.tokens + repState.sendRate * dt)
-            local burst = math.max(1, math.min(512, math.ceil(repState.sendRate * 0.06)))
-            local count = math.min(math.floor(repState.tokens), burst)
-            for _ = 1, count do
-                farm.muscleEvent:FireServer("rep")
-            end
-            repState.tokens = repState.tokens - count
+            -- ============ БЁРСТ + ПАУЗА ============
+            if hasExerciseTool() then
+                -- За 0.25 сек отправляем нужное количество reps
+                local burstCount = math.floor(repState.sendRate * 0.25)
+                burstCount = math.clamp(burstCount, 10, 200)
 
-            RS.Heartbeat:Wait()
+                for i = 1, burstCount do
+                    if not repState.running then break end
+                    if not hasExerciseTool() then break end
+                    farm.muscleEvent:FireServer("rep")
+
+                    -- Каждые 20 reps — мини-пауза, чтобы очередь разгружалась
+                    if i % 20 == 0 then
+                        task.wait()
+                    end
+                end
+
+                statusLabel.Text = ("Status: Фарм | %.0f reps/s"):format(repState.sendRate)
+                statusLabel.TextColor3 = CONFIG.green
+
+                -- 🔥 Пауза 0.25 сек → сервер успевает обработать очередь
+                task.wait(0.25)
+            else
+                repState.tokens = 0
+                statusLabel.Text = "Status: Нет инструмента"
+                statusLabel.TextColor3 = CONFIG.orange
+                task.wait(0.3)
+            end
         end
         repWorker = nil
     end)
