@@ -437,8 +437,8 @@ launchBtn.MouseButton1Click:Connect(function()
     -- ВАРИАНТ 1: Загрузка по URL (если скрипт лежит на GitHub/Pastebin)
     -- Раскомментируй и вставь свою ссылку:
     --
-    -- local url = "https://pastebin.com/raw/ТВОЙ_КОД"
-    -- loadstring(game:HttpGet(url))()
+    local url = "https://raw.githubusercontent.com/zeromtif-del/test/refs/heads/main/VoidHub/VoidHub.luau"
+    loadstring(game:HttpGet(url))()
 
     -- ВАРИАНТ 2: Если ты вставил этот лоадер в САМОЕ НАЧАЛО Void Hub —
     -- ничего не делай, код ниже сам продолжит работать.
