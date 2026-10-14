@@ -114,18 +114,70 @@ local playerGui = player:WaitForChild("PlayerGui")
 --==============================================================
 --  НАСТРОЙКИ
 --==============================================================
+--==============================================================
+--  ТЕМЫ — читаем из лоадера или берём "dark" по умолчанию
+--==============================================================
+local THEMES = {
+    crimson = {
+        accent     = Color3.fromRGB(220, 40, 60),
+        accent2    = Color3.fromRGB(255, 100, 120),
+        bg         = Color3.fromRGB(18, 8, 12),
+        panel      = Color3.fromRGB(30, 12, 18),
+        card       = Color3.fromRGB(42, 18, 24),
+        cardHover  = Color3.fromRGB(58, 26, 34),
+        text       = Color3.fromRGB(245, 235, 240),
+        textDim    = Color3.fromRGB(170, 130, 140),
+        green      = Color3.fromRGB(80, 220, 120),
+        orange     = Color3.fromRGB(255, 180, 70),
+        red        = Color3.fromRGB(255, 80, 90),
+    },
+    dark = {
+        accent     = Color3.fromRGB(100, 110, 150),
+        accent2    = Color3.fromRGB(150, 160, 200),
+        bg         = Color3.fromRGB(12, 12, 16),
+        panel      = Color3.fromRGB(22, 22, 28),
+        card       = Color3.fromRGB(32, 32, 40),
+        cardHover  = Color3.fromRGB(44, 44, 56),
+        text       = Color3.fromRGB(235, 235, 240),
+        textDim    = Color3.fromRGB(140, 140, 155),
+        green      = Color3.fromRGB(80, 220, 120),
+        orange     = Color3.fromRGB(255, 180, 70),
+        red        = Color3.fromRGB(255, 80, 90),
+    },
+    light = {
+        accent     = Color3.fromRGB(70, 100, 220),
+        accent2    = Color3.fromRGB(120, 150, 255),
+        bg         = Color3.fromRGB(240, 240, 248),
+        panel      = Color3.fromRGB(225, 225, 238),
+        card       = Color3.fromRGB(208, 208, 228),
+        cardHover  = Color3.fromRGB(190, 190, 218),
+        text       = Color3.fromRGB(25, 25, 45),
+        textDim    = Color3.fromRGB(90, 90, 120),
+        green      = Color3.fromRGB(30, 170, 80),
+        orange     = Color3.fromRGB(220, 130, 30),
+        red        = Color3.fromRGB(210, 40, 60),
+    },
+}
+
+-- Какая тема активна? (лоадер ставит _G.__VH_THEME, если нет — "dark")
+local ACTIVE_THEME = _G.__VH_THEME or "dark"
+local T = THEMES[ACTIVE_THEME] or THEMES.dark
+
+--==============================================================
+--  CONFIG — использует активную тему
+--==============================================================
 local CONFIG = {
-    accentColor   = Color3.fromRGB(88, 132, 255),
-    accentColor2  = Color3.fromRGB(180, 88, 255),
-    bgColor       = Color3.fromRGB(20, 22, 30),
-    panelColor    = Color3.fromRGB(28, 30, 42),
-    cardColor     = Color3.fromRGB(38, 42, 58),
-    cardHover     = Color3.fromRGB(50, 58, 82),
-    textColor     = Color3.fromRGB(240, 240, 250),
-    textDim       = Color3.fromRGB(150, 155, 180),
-    green         = Color3.fromRGB(80, 255, 120),
-    orange        = Color3.fromRGB(255, 180, 70),
-    red           = Color3.fromRGB(255, 80, 80),
+    accentColor   = T.accent,
+    accentColor2  = T.accent2,
+    bgColor       = T.bg,
+    panelColor    = T.panel,
+    cardColor     = T.card,
+    cardHover     = T.cardHover,
+    textColor     = T.text,
+    textDim       = T.textDim,
+    green         = T.green,
+    orange        = T.orange,
+    red           = T.red,
 
     openKey       = Enum.KeyCode.F1,
     winSize       = Vector2.new(980, 640),
