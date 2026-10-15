@@ -2794,7 +2794,7 @@ end
 refreshModeButtons()
 
 -- Задержка
-makeInputRow(scroll6, "Задержка (0.05+)", "0.2", function(v)
+makeInputRow(scroll6, "Задержка (0.05+)", "0.5", function(v)
     if v and v >= 0.05 then
         crystalState.delay = v
     end
