@@ -2368,9 +2368,7 @@ end)
 --==============================================================
 --  🔮 AUTO OPEN CRYSTAL — 4 режима
 --==============================================================
-makeToggleRow(scroll6, "🔮 Auto Open Crystal", false, function(on)
-    print("Auto Crystal тумблер:", on)
-end)
+makeSectionHeader(scroll6, "🔮 Auto Open Crystal")
 
 local crystalState = {
     running = false,
