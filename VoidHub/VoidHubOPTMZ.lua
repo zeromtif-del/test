@@ -8,6 +8,53 @@ _G.__VH_GEN = (_G.__VH_GEN or 0) + 1
 local MY_GEN = _G.__VH_GEN
 
 do
+
+--==============================================================
+--  📁 РЕЕСТР КОНФИГОВ
+--==============================================================
+_G.__VH_CONFIG_REGISTRY = {
+    toggles = {},
+    inputs = {},
+}
+
+--==============================================================
+--  📂 ХЕЛПЕР ДЛЯ ПАПОК (nested через "/")
+--==============================================================
+_G.__VH_Folder = {}
+
+function _G.__VH_Folder.ensure(path)
+    if not makefolder or not isfolder then return false end
+
+    -- Разбиваем по "/"
+    local parts = {}
+    for part in string.gmatch(path, "[^/]+") do
+        table.insert(parts, part)
+    end
+
+    -- Создаём поочерёдно
+    local current = ""
+    for i, part in ipairs(parts) do
+        current = (i == 1) and part or (current .. "/" .. part)
+        if not isfolder(current) then
+            pcall(function() makefolder(current) end)
+        end
+    end
+    return true
+end
+
+function _G.__VH_Folder.exists(path)
+    if not isfolder then return false end
+    local ok, res = pcall(isfolder, path)
+    return ok and res
+end
+
+function _G.__VH_Folder.list(path)
+    if not listfiles then return {} end
+    local ok, files = pcall(listfiles, path)
+    if ok and type(files) == "table" then return files end
+    return {}
+end
+    
     local Players = game:GetService("Players")
     local plr = Players.LocalPlayer
 
@@ -662,6 +709,39 @@ local function makeInputRow(parent, labelText, defaultText, callback)
     return box
 end
 
+--==============================================================
+--  📁 ОБЁРТКИ ДЛЯ АВТО-РЕГИСТРАЦИИ В КОНФИГАХ
+--==============================================================
+do
+    local _origToggle = makeToggleRow
+    makeToggleRow = function(parent, labelText, initial, callback)
+        local obj = _origToggle(parent, labelText, initial, callback)
+        table.insert(_G.__VH_CONFIG_REGISTRY.toggles, {
+            name = labelText,
+            get = function() return obj.Get() end,
+            set = function(on) obj.Set(on) end,
+        })
+        return obj
+    end
+end
+
+do
+    local _origInput = makeInputRow
+    makeInputRow = function(parent, labelText, defaultText, callback)
+        local box = _origInput(parent, labelText, defaultText, callback)
+        table.insert(_G.__VH_CONFIG_REGISTRY.inputs, {
+            name = labelText,
+            get = function() return box.Text end,
+            set = function(v)
+                box.Text = tostring(v)
+                local num = tonumber(v)
+                if num and callback then callback(num) end
+            end,
+        })
+        return box
+    end
+end
+
 local TABS = {
     { icon = "📍", name = "Локации" },
     { icon = "⭐", name = "Мои точки" },
@@ -673,6 +753,7 @@ local TABS = {
     { icon = "📊", name = "Статы" },
     { icon = "🎃", name = "Halloween" },
     { icon = "🎨", name = "Визуалы" },
+    { icon = "📁", name = "Конфиги" },
 }
 
 local tabButtons = {}
@@ -723,7 +804,7 @@ end
 
 local scroll1, scroll2, scroll3 = scrolls[1], scrolls[2], scrolls[3]
 local scroll4, scroll5, scroll6 = scrolls[4], scrolls[5], scrolls[6]
-local scroll7, scroll8, scroll9, scroll10 = scrolls[7], scrolls[8], scrolls[9], scrolls[10]
+local scroll7, scroll8, scroll9, scroll10, scroll11 = scrolls[7], scrolls[8], scrolls[9], scrolls[10], scrolls[11]
 
 switchTab = function(idx)
     if idx == currentTab then return end
@@ -3764,4 +3845,464 @@ task.defer(function()
     end)
 
     print("[Visuals] Вкладка загружена.")
+end)
+
+--==============================================================
+--  📁 ВКЛАДКА «КОНФИГИ» (с папками)
+--==============================================================
+task.defer(function()
+    task.wait(0.7)
+
+    local HttpService = game:GetService("HttpService")
+
+    -------------------------------------------------------------
+    -- Папка для конфигов
+    -------------------------------------------------------------
+    local ROOT_FOLDER = "VoidHub"
+    local CONFIGS_FOLDER = ROOT_FOLDER .. "/Configs"
+
+    -- Создаём структуру
+    _G.__VH_Folder.ensure(CONFIGS_FOLDER)
+
+    -------------------------------------------------------------
+    -- Загрузка всех конфигов из папки
+    -------------------------------------------------------------
+    local configs = {}
+
+    local function loadAllFromDisk()
+        local result = {}
+
+        if not listfiles then
+            return result
+        end
+
+        local files = _G.__VH_Folder.list(CONFIGS_FOLDER)
+        for _, filePath in ipairs(files) do
+            -- Только .json
+            local ok, ext = pcall(function()
+                return string.match(filePath, "%.(%w+)$")
+            end)
+            if ok and ext and ext:lower() == "json" then
+                -- Имя файла без пути и расширения
+                local name = filePath:match("([^/\\]+)%.json$")
+                if name then
+                    local ok2, data = pcall(function()
+                        return HttpService:JSONDecode(readfile(filePath))
+                    end)
+                    if ok2 and type(data) == "table" then
+                        result[name] = data
+                    end
+                end
+            end
+        end
+
+        return result
+    end
+
+    -------------------------------------------------------------
+    -- Сохранить один конфиг
+    -------------------------------------------------------------
+    local function saveOneToDisk(name, state)
+        if not writefile then return false end
+
+        local path = CONFIGS_FOLDER .. "/" .. name .. ".json"
+        local ok = pcall(function()
+            writefile(path, HttpService:JSONEncode(state))
+        end)
+        return ok
+    end
+
+    -------------------------------------------------------------
+    -- Удалить файл конфига
+    -------------------------------------------------------------
+    local function deleteFromDisk(name)
+        if not delfile then return false end
+
+        local path = CONFIGS_FOLDER .. "/" .. name .. ".json"
+        local ok = pcall(function()
+            delfile(path)
+        end)
+        return ok
+    end
+
+    -------------------------------------------------------------
+    -- Загружаем при старте
+    -------------------------------------------------------------
+    configs = loadAllFromDisk()
+
+    -------------------------------------------------------------
+    -- Popup: ввод имени
+    -------------------------------------------------------------
+    local function showPrompt(title, placeholder, onConfirm)
+        local promptGui = Instance.new("ScreenGui")
+        promptGui.Name = "VoidHubPrompt"
+        promptGui.ResetOnSpawn = false
+        promptGui.DisplayOrder = 100
+        promptGui.Parent = playerGui
+
+        local bg = Instance.new("TextButton")
+        bg.Size = UDim2.fromScale(1, 1)
+        bg.BackgroundColor3 = Color3.new(0, 0, 0)
+        bg.BackgroundTransparency = 0.5
+        bg.Text = ""
+        bg.AutoButtonColor = false
+        bg.Parent = promptGui
+
+        local box = Instance.new("Frame")
+        box.Size = UDim2.fromOffset(380, 180)
+        box.Position = UDim2.new(0.5, -190, 0.5, -90)
+        box.BackgroundColor3 = CONFIG.bgColor
+        box.BorderSizePixel = 0
+        box.Parent = promptGui
+        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 14)
+
+        local st = Instance.new("UIStroke")
+        st.Color = CONFIG.accentColor
+        st.Thickness = 2
+        st.Parent = box
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -30, 0, 30)
+        lbl.Position = UDim2.new(0, 15, 0, 15)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = title
+        lbl.TextColor3 = CONFIG.textColor
+        lbl.TextSize = 15
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = box
+
+        local tb = Instance.new("TextBox")
+        tb.Size = UDim2.new(1, -30, 0, 40)
+        tb.Position = UDim2.new(0, 15, 0, 58)
+        tb.BackgroundColor3 = CONFIG.panelColor
+        tb.Text = ""
+        tb.PlaceholderText = placeholder or ""
+        tb.TextColor3 = CONFIG.textColor
+        tb.PlaceholderColor3 = CONFIG.textDim
+        tb.TextSize = 14
+        tb.Font = Enum.Font.Gotham
+        tb.ClearTextOnFocus = false
+        tb.Parent = box
+        Instance.new("UICorner", tb).CornerRadius = UDim.new(0, 8)
+
+        local ok = Instance.new("TextButton")
+        ok.Size = UDim2.fromOffset(120, 36)
+        ok.Position = UDim2.new(1, -270, 1, -52)
+        ok.BackgroundColor3 = Color3.fromRGB(50, 130, 80)
+        ok.Text = "✓ Создать"
+        ok.TextColor3 = Color3.new(1,1,1)
+        ok.TextSize = 13
+        ok.Font = Enum.Font.GothamBold
+        ok.Parent = box
+        Instance.new("UICorner", ok).CornerRadius = UDim.new(0, 8)
+
+        local cancel = Instance.new("TextButton")
+        cancel.Size = UDim2.fromOffset(120, 36)
+        cancel.Position = UDim2.new(1, -145, 1, -52)
+        cancel.BackgroundColor3 = Color3.fromRGB(90, 45, 55)
+        cancel.Text = "✕ Отмена"
+        cancel.TextColor3 = Color3.new(1,1,1)
+        cancel.TextSize = 13
+        cancel.Font = Enum.Font.GothamBold
+        cancel.Parent = box
+        Instance.new("UICorner", cancel).CornerRadius = UDim.new(0, 8)
+
+        task.defer(function() tb:CaptureFocus() end)
+
+        local done = false
+        local function finish(save)
+            if done then return end
+            done = true
+            if save and tb.Text ~= "" then
+                onConfirm(tb.Text)
+            end
+            promptGui:Destroy()
+        end
+
+        ok.MouseButton1Click:Connect(function() finish(true) end)
+        cancel.MouseButton1Click:Connect(function() finish(false) end)
+        bg.MouseButton1Click:Connect(function() finish(false) end)
+        tb.FocusLost:Connect(function(enter)
+            if enter then finish(true) end
+        end)
+    end
+
+    -------------------------------------------------------------
+    -- Popup: список
+    -------------------------------------------------------------
+    local function showListPopup(title, list, onSelect)
+        local promptGui = Instance.new("ScreenGui")
+        promptGui.Name = "VoidHubListPrompt"
+        promptGui.ResetOnSpawn = false
+        promptGui.DisplayOrder = 100
+        promptGui.Parent = playerGui
+
+        local bg = Instance.new("TextButton")
+        bg.Size = UDim2.fromScale(1, 1)
+        bg.BackgroundColor3 = Color3.new(0, 0, 0)
+        bg.BackgroundTransparency = 0.5
+        bg.Text = ""
+        bg.AutoButtonColor = false
+        bg.Parent = promptGui
+
+        local box = Instance.new("Frame")
+        box.Size = UDim2.fromOffset(400, 400)
+        box.Position = UDim2.new(0.5, -200, 0.5, -200)
+        box.BackgroundColor3 = CONFIG.bgColor
+        box.BorderSizePixel = 0
+        box.Parent = promptGui
+        Instance.new("UICorner", box).CornerRadius = UDim.new(0, 14)
+
+        local st = Instance.new("UIStroke")
+        st.Color = CONFIG.accentColor
+        st.Thickness = 2
+        st.Parent = box
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -30, 0, 34)
+        lbl.Position = UDim2.new(0, 15, 0, 12)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = title
+        lbl.TextColor3 = CONFIG.textColor
+        lbl.TextSize = 15
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = box
+
+        local scroll = Instance.new("ScrollingFrame")
+        scroll.Size = UDim2.new(1, -30, 1, -120)
+        scroll.Position = UDim2.new(0, 15, 0, 55)
+        scroll.BackgroundColor3 = CONFIG.panelColor
+        scroll.BorderSizePixel = 0
+        scroll.ScrollBarThickness = 4
+        scroll.ScrollBarImageColor3 = CONFIG.accentColor
+        scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        scroll.Parent = box
+        Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 8)
+
+        local layout = Instance.new("UIListLayout")
+        layout.Padding = UDim.new(0, 4)
+        layout.Parent = scroll
+
+        local pad = Instance.new("UIPadding")
+        pad.PaddingLeft = UDim.new(0, 6)
+        pad.PaddingRight = UDim.new(0, 6)
+        pad.PaddingTop = UDim.new(0, 6)
+        pad.PaddingBottom = UDim.new(0, 6)
+        pad.Parent = scroll
+
+        local done = false
+        local function close()
+            if done then return end
+            done = true
+            promptGui:Destroy()
+        end
+
+        local count = 0
+        for name in pairs(list) do
+            count = count + 1
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(1, -8, 0, 34)
+            b.BackgroundColor3 = CONFIG.cardColor
+            b.Text = "  " .. name
+            b.TextColor3 = CONFIG.textColor
+            b.TextSize = 13
+            b.Font = Enum.Font.GothamMedium
+            b.AutoButtonColor = false
+            b.TextXAlignment = Enum.TextXAlignment.Left
+            b.Parent = scroll
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+
+            b.MouseEnter:Connect(function() b.BackgroundColor3 = CONFIG.cardHover end)
+            b.MouseLeave:Connect(function() b.BackgroundColor3 = CONFIG.cardColor end)
+            b.MouseButton1Click:Connect(function()
+                onSelect(name)
+                close()
+            end)
+        end
+
+        if count == 0 then
+            local empty = Instance.new("TextLabel")
+            empty.Size = UDim2.new(1, -8, 0, 30)
+            empty.BackgroundTransparency = 1
+            empty.Text = "Нет конфигов"
+            empty.TextColor3 = CONFIG.textDim
+            empty.TextSize = 13
+            empty.Font = Enum.Font.Gotham
+            empty.Parent = scroll
+        end
+
+        local cancel = Instance.new("TextButton")
+        cancel.Size = UDim2.fromOffset(120, 34)
+        cancel.Position = UDim2.new(0.5, -60, 1, -46)
+        cancel.BackgroundColor3 = Color3.fromRGB(90, 45, 55)
+        cancel.Text = "✕ Закрыть"
+        cancel.TextColor3 = Color3.new(1,1,1)
+        cancel.TextSize = 13
+        cancel.Font = Enum.Font.GothamBold
+        cancel.Parent = box
+        Instance.new("UICorner", cancel).CornerRadius = UDim.new(0, 8)
+
+        cancel.MouseButton1Click:Connect(close)
+        bg.MouseButton1Click:Connect(close)
+    end
+
+    -------------------------------------------------------------
+    -- Захват / применение
+    -------------------------------------------------------------
+    local function captureState()
+        local state = { toggles = {}, inputs = {} }
+        for _, t in ipairs(_G.__VH_CONFIG_REGISTRY.toggles) do
+            local ok, val = pcall(t.get)
+            if ok then state.toggles[t.name] = val end
+        end
+        for _, i in ipairs(_G.__VH_CONFIG_REGISTRY.inputs) do
+            local ok, val = pcall(i.get)
+            if ok then state.inputs[i.name] = val end
+        end
+        return state
+    end
+
+    local function applyState(state)
+        if not state then return end
+        if state.toggles then
+            for _, t in ipairs(_G.__VH_CONFIG_REGISTRY.toggles) do
+                if state.toggles[t.name] ~= nil then
+                    pcall(function() t.set(state.toggles[t.name]) end)
+                end
+            end
+        end
+        if state.inputs then
+            for _, i in ipairs(_G.__VH_CONFIG_REGISTRY.inputs) do
+                if state.inputs[i.name] ~= nil then
+                    pcall(function() i.set(state.inputs[i.name]) end)
+                end
+            end
+        end
+    end
+
+    -------------------------------------------------------------
+    -- UI
+    -------------------------------------------------------------
+    makeSectionHeader(scroll11, "📁 Конфиги")
+
+    local statusLabel = makeInfoLabel(scroll11, "Конфигов: 0", CONFIG.textDim)
+    local currentLabel = makeInfoLabel(scroll11, "Загружен: —", CONFIG.textDim)
+    local folderLabel = makeInfoLabel(scroll11, "Папка: " .. CONFIGS_FOLDER, CONFIG.textDim)
+
+    local function updateStatus()
+        local count = 0
+        for _ in pairs(configs) do count = count + 1 end
+        statusLabel.Text = ("Конфигов: %d"):format(count)
+    end
+    updateStatus()
+
+    -------------------------------------------------------------
+    -- Создать конфиг
+    -------------------------------------------------------------
+    makeActionRow(scroll11, "💾 Создать конфиг", Color3.fromRGB(50, 130, 80), function()
+        showPrompt("Название конфига", "My Config", function(name)
+            -- Создаём папку если ещё нет
+            _G.__VH_Folder.ensure(CONFIGS_FOLDER)
+
+            local state = captureState()
+            configs[name] = state
+
+            local saved = saveOneToDisk(name, state)
+            if saved then
+                currentLabel.Text = "Создан: " .. name
+                currentLabel.TextColor3 = CONFIG.green
+                print("[Configs] Создан:", name, "->", CONFIGS_FOLDER .. "/" .. name .. ".json")
+            else
+                currentLabel.Text = "Создан (в памяти): " .. name
+                currentLabel.TextColor3 = CONFIG.orange
+                print("[Configs] Создан (без записи):", name)
+            end
+            updateStatus()
+        end)
+    end)
+
+    -------------------------------------------------------------
+    -- Загрузить
+    -------------------------------------------------------------
+    makeActionRow(scroll11, "📂 Загрузить конфиг", Color3.fromRGB(60, 90, 180), function()
+        configs = loadAllFromDisk()
+        updateStatus()
+
+        if next(configs) == nil then
+            currentLabel.Text = "Нет конфигов в папке"
+            currentLabel.TextColor3 = CONFIG.red
+            return
+        end
+
+        showListPopup("Выбери конфиг для загрузки", configs, function(name)
+            local state = configs[name]
+            if not state then return end
+            applyState(state)
+            currentLabel.Text = "Загружен: " .. name
+            currentLabel.TextColor3 = CONFIG.green
+            print("[Configs] Загружен:", name)
+        end)
+    end)
+
+    -------------------------------------------------------------
+    -- Удалить
+    -------------------------------------------------------------
+    makeActionRow(scroll11, "🗑 Удалить конфиг", Color3.fromRGB(120, 50, 60), function()
+        configs = loadAllFromDisk()
+        updateStatus()
+
+        if next(configs) == nil then
+            currentLabel.Text = "Нет конфигов для удаления"
+            currentLabel.TextColor3 = CONFIG.red
+            return
+        end
+
+        showListPopup("Выбери конфиг для удаления", configs, function(name)
+            configs[name] = nil
+            deleteFromDisk(name)
+            updateStatus()
+            if currentLabel.Text == "Загружен: " .. name then
+                currentLabel.Text = "Загружен: —"
+                currentLabel.TextColor3 = CONFIG.textDim
+            end
+            print("[Configs] Удалён:", name)
+        end)
+    end)
+
+    -------------------------------------------------------------
+    -- Обновить / открыть папку
+    -------------------------------------------------------------
+    makeActionRow(scroll11, "🔄 Обновить список", CONFIG.cardColor, function()
+        configs = loadAllFromDisk()
+        updateStatus()
+        currentLabel.Text = "Список обновлён"
+        currentLabel.TextColor3 = CONFIG.green
+    end)
+
+    makeActionRow(scroll11, "📂 Создать папку снова", CONFIG.cardColor, function()
+        _G.__VH_Folder.ensure(CONFIGS_FOLDER)
+        currentLabel.Text = "Папка проверена: " .. CONFIGS_FOLDER
+        currentLabel.TextColor3 = CONFIG.green
+    end)
+
+    -------------------------------------------------------------
+    -- Очистить всё
+    -------------------------------------------------------------
+    makeActionRow(scroll11, "❌ Очистить все конфиги", Color3.fromRGB(90, 45, 55), function()
+        for name in pairs(configs) do
+            deleteFromDisk(name)
+        end
+        configs = {}
+        updateStatus()
+        currentLabel.Text = "Загружен: —"
+        currentLabel.TextColor3 = CONFIG.textDim
+    end)
+
+    makeInfoLabel(scroll11, "Файлы: VoidHub/Configs/имя.json", CONFIG.textDim)
+    makeInfoLabel(scroll11, "Работает через makefolder + writefile", CONFIG.textDim)
+
+    print("[Configs] Загружено. Папка: " .. CONFIGS_FOLDER)
 end)
