@@ -709,6 +709,7 @@ local TABS = {
     { icon = "📦", name = "Инвентарь" },
     { icon = "📊", name = "Статы" },
     { icon = "🎃", name = "Halloween" },
+    { icon = "🎨", name = "Визуалы" },
 }
 
 local tabButtons = {}
@@ -759,7 +760,7 @@ end
 
 local scroll1, scroll2, scroll3 = scrolls[1], scrolls[2], scrolls[3]
 local scroll4, scroll5, scroll6 = scrolls[4], scrolls[5], scrolls[6]
-local scroll7, scroll8, scroll9 = scrolls[7], scrolls[8], scrolls[9]
+local scroll7, scroll8, scroll9, scroll10 = scrolls[7], scrolls[8], scrolls[9], scrolls[10]
 
 switchTab = function(idx)
     if idx == currentTab then return end
@@ -3347,4 +3348,548 @@ task.defer(function()
     end)
 
     print("[Whitelist] Загружено.")
+end)
+
+--==============================================================
+--  🎨 ВКЛАДКА «ВИЗУАЛЫ»
+--==============================================================
+task.defer(function()
+    task.wait(0.5)
+
+    --==========================================================
+    -- Состояние
+    --==========================================================
+    local visual = {
+        -- Небо / солнце
+        skyRunning = false,
+        -- Туман
+        fogRunning = false,
+        fogStart = 0,
+        fogEnd = 500,
+        fogColor = Color3.fromRGB(200, 200, 220),
+        -- Частицы
+        particlesRunning = false,
+        -- ESP
+        espRunning = false,
+        espColor = Color3.fromRGB(255, 60, 60),
+        espShowName = true,
+        espShowDistance = true,
+        -- Круг при прыжке
+        jumpRingRunning = false,
+        jumpRingColor = Color3.fromRGB(120, 180, 255),
+        jumpRingSize = 6,
+    }
+
+    --==========================================================
+    -- Утилита: сброс освещения
+    --==========================================================
+    local function resetLighting()
+        pcall(function()
+            Lighting.FogStart = 0
+            Lighting.FogEnd = 100000
+            Lighting.FogColor = Color3.fromRGB(192, 192, 192)
+            Lighting.Brightness = 2
+            Lighting.ClockTime = 14
+            Lighting.Ambient = Color3.fromRGB(70, 70, 70)
+            Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        end)
+    end
+
+    --==========================================================
+    -- СЕКЦИЯ: НЕБО И СОЛНЦЕ
+    --==========================================================
+    makeSectionHeader(scroll10, "☀️ Небо и солнце")
+
+    -- ClockTime
+    makeInputRow(scroll10, "Время (0-24)", "14", function(v)
+        if v then
+            Lighting.ClockTime = math.clamp(v, 0, 24)
+        end
+    end)
+
+    -- Brightness
+    makeInputRow(scroll10, "Яркость", "2", function(v)
+        if v then
+            Lighting.Brightness = math.clamp(v, 0, 10)
+        end
+    end)
+
+    -- Sun color via ClockTime presets
+    makeActionRow(scroll10, "🌅 Рассвет (6:00)", Color3.fromRGB(255, 160, 80), function()
+        Lighting.ClockTime = 6
+    end)
+    makeActionRow(scroll10, "☀️ День (12:00)", Color3.fromRGB(255, 220, 100), function()
+        Lighting.ClockTime = 12
+    end)
+    makeActionRow(scroll10, "🌇 Закат (18:00)", Color3.fromRGB(255, 120, 60), function()
+        Lighting.ClockTime = 18
+    end)
+    makeActionRow(scroll10, "🌙 Ночь (0:00)", Color3.fromRGB(80, 90, 160), function()
+        Lighting.ClockTime = 0
+    end)
+
+    -- Сброс
+    makeActionRow(scroll10, "🔄 Сбросить освещение", Color3.fromRGB(90, 45, 55), function()
+        resetLighting()
+    end)
+
+    --==========================================================
+    -- СЕКЦИЯ: ТУМАН
+    --==========================================================
+    makeSectionHeader(scroll10, "🌫️ Туман")
+
+    makeInputRow(scroll10, "Начало тумана", "0", function(v)
+        if v then
+            visual.fogStart = math.clamp(v, 0, 10000)
+            if visual.fogRunning then
+                Lighting.FogStart = visual.fogStart
+            end
+        end
+    end)
+
+    makeInputRow(scroll10, "Конец тумана", "500", function(v)
+        if v then
+            visual.fogEnd = math.clamp(v, 10, 100000)
+            if visual.fogRunning then
+                Lighting.FogEnd = visual.fogEnd
+            end
+        end
+    end)
+
+    -- Пресеты цвета тумана
+    makeActionRow(scroll10, "🌫️ Серый туман", Color3.fromRGB(150, 150, 160), function()
+        visual.fogColor = Color3.fromRGB(180, 180, 190)
+        if visual.fogRunning then
+            Lighting.FogColor = visual.fogColor
+        end
+    end)
+    makeActionRow(scroll10, "🌃 Ночной туман", Color3.fromRGB(30, 30, 60), function()
+        visual.fogColor = Color3.fromRGB(20, 20, 50)
+        if visual.fogRunning then
+            Lighting.FogColor = visual.fogColor
+        end
+    end)
+    makeActionRow(scroll10, "🩸 Кровавый туман", Color3.fromRGB(120, 20, 20), function()
+        visual.fogColor = Color3.fromRGB(120, 20, 20)
+        if visual.fogRunning then
+            Lighting.FogColor = visual.fogColor
+        end
+    end)
+    makeActionRow(scroll10, "🟣 Фиолетовый туман", Color3.fromRGB(100, 60, 150), function()
+        visual.fogColor = Color3.fromRGB(100, 60, 150)
+        if visual.fogRunning then
+            Lighting.FogColor = visual.fogColor
+        end
+    end)
+    makeActionRow(scroll10, "💚 Зелёный туман", Color3.fromRGB(60, 130, 60), function()
+        visual.fogColor = Color3.fromRGB(60, 130, 60)
+        if visual.fogRunning then
+            Lighting.FogColor = visual.fogColor
+        end
+    end)
+
+    makeToggleRow(scroll10, "Применить туман", false, function(on)
+        visual.fogRunning = on
+        if on then
+            Lighting.FogStart = visual.fogStart
+            Lighting.FogEnd = visual.fogEnd
+            Lighting.FogColor = visual.fogColor
+        else
+            Lighting.FogStart = 0
+            Lighting.FogEnd = 100000
+            Lighting.FogColor = Color3.fromRGB(192, 192, 192)
+        end
+    end)
+
+    --==========================================================
+    -- СЕКЦИЯ: ЧАСТИЦЫ В ВОЗДУХЕ
+    --==========================================================
+    makeSectionHeader(scroll10, "✨ Частицы в воздухе")
+
+    local airParticle = nil
+
+    makeToggleRow(scroll10, "Плавающие частицы", false, function(on)
+        visual.particlesRunning = on
+
+        if on then
+            local cam = workspace.CurrentCamera
+            if not cam then return end
+
+            -- Удаляем старые
+            if airParticle and airParticle.Parent then
+                airParticle:Destroy()
+            end
+
+            -- Создаём
+            airParticle = Instance.new("ParticleEmitter")
+            airParticle.Name = "VoidHubAirParticles"
+            airParticle.Texture = "rbxassetid://243660364"   -- маленькая точка
+            airParticle.LightEmission = 0.5
+            airParticle.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(180, 200, 255)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(220, 180, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 220, 180)),
+            })
+            airParticle.Size = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0.1),
+                NumberSequenceKeypoint.new(0.5, 0.3),
+                NumberSequenceKeypoint.new(1, 0),
+            })
+            airParticle.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 1),
+                NumberSequenceKeypoint.new(0.2, 0.3),
+                NumberSequenceKeypoint.new(1, 1),
+            })
+            airParticle.Lifetime = NumberRange.new(4, 8)
+            airParticle.Rate = 15
+            airParticle.Speed = NumberRange.new(1, 3)
+            airParticle.SpreadAngle = Vector2.new(180, 180)
+            airParticle.Rotation = NumberRange.new(0, 360)
+            airParticle.RotSpeed = NumberRange.new(-30, 30)
+            airParticle.VelocityInheritance = 0
+            airParticle.Parent = cam
+        else
+            if airParticle and airParticle.Parent then
+                airParticle:Destroy()
+                airParticle = nil
+            end
+        end
+    end)
+
+    --==========================================================
+    -- СЕКЦИЯ: ESP ИГРОКОВ
+    --==========================================================
+    makeSectionHeader(scroll10, "👁️ ESP игроков")
+
+    local espHighlights = {}
+
+    local function clearESP()
+        for plr, highlight in pairs(espHighlights) do
+            pcall(function()
+                if highlight and highlight.Parent then
+                    highlight:Destroy()
+                end
+            end)
+        end
+        espHighlights = {}
+    end
+
+    local function createESP(targetPlayer)
+        if targetPlayer == player then return end
+        if not targetPlayer.Character then return end
+
+        -- Уже есть?
+        if espHighlights[targetPlayer] and espHighlights[targetPlayer].Parent then
+            return
+        end
+
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "VoidHubESP"
+        highlight.FillColor = visual.espColor
+        highlight.FillTransparency = 0.5
+        highlight.OutlineColor = Color3.new(1, 1, 1)
+        highlight.OutlineTransparency = 0
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.Adornee = targetPlayer.Character
+        highlight.Parent = targetPlayer.Character
+
+        espHighlights[targetPlayer] = highlight
+
+        -- Имя над головой
+        if visual.espShowName then
+            local head = targetPlayer.Character:FindFirstChild("Head")
+            if head and not head:FindFirstChild("VoidHubNameTag") then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Name = "VoidHubNameTag"
+                billboard.Size = UDim2.fromOffset(200, 50)
+                billboard.StudsOffset = Vector3.new(0, 3, 0)
+                billboard.AlwaysOnTop = true
+                billboard.Adornee = head
+                billboard.Parent = head
+
+                local nameLbl = Instance.new("TextLabel")
+                nameLbl.Size = UDim2.new(1, 0, 0, 20)
+                nameLbl.BackgroundTransparency = 1
+                nameLbl.Text = targetPlayer.Name
+                nameLbl.TextColor3 = visual.espColor
+                nameLbl.TextSize = 14
+                nameLbl.Font = Enum.Font.GothamBold
+                nameLbl.TextStrokeTransparency = 0.3
+                nameLbl.Parent = billboard
+
+                local distLbl = Instance.new("TextLabel")
+                distLbl.Name = "Distance"
+                distLbl.Size = UDim2.new(1, 0, 0, 16)
+                distLbl.Position = UDim2.new(0, 0, 0, 20)
+                distLbl.BackgroundTransparency = 1
+                distLbl.Text = "0 studs"
+                distLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+                distLbl.TextSize = 11
+                distLbl.Font = Enum.Font.Gotham
+                distLbl.TextStrokeTransparency = 0.5
+                distLbl.Parent = billboard
+            end
+        end
+    end
+
+    -- Обновление дистанции
+    task.spawn(function()
+        while _G.__VH_GEN == MY_GEN do
+            if visual.espRunning then
+                local myHRP = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                for _, other in ipairs(Players:GetPlayers()) do
+                    if other ~= player and other.Character then
+                        createESP(other)
+                        if myHRP then
+                            local oHRP = other.Character:FindFirstChild("HumanoidRootPart")
+                            local head = other.Character:FindFirstChild("Head")
+                            if oHRP and head then
+                                local tag = head:FindFirstChild("VoidHubNameTag")
+                                if tag then
+                                    local dist = tag:FindFirstChild("Distance")
+                                    if dist then
+                                        dist.Text = ("%d studs"):format(
+                                            math.floor((myHRP.Position - oHRP.Position).Magnitude))
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+            task.wait(0.5)
+        end
+    end)
+
+    -- Обработчик смертей / респавнов
+    Players.PlayerAdded:Connect(function(p)
+        p.CharacterAdded:Connect(function()
+            if visual.espRunning then
+                task.wait(0.5)
+                createESP(p)
+            end
+        end)
+    end)
+
+    Players.PlayerRemoving:Connect(function(p)
+        if espHighlights[p] then
+            pcall(function() espHighlights[p]:Destroy() end)
+            espHighlights[p] = nil
+        end
+    end)
+
+    -- Цвета ESP
+    makeActionRow(scroll10, "🔴 Красный ESP", Color3.fromRGB(255, 60, 60), function()
+        visual.espColor = Color3.fromRGB(255, 60, 60)
+        for _, h in pairs(espHighlights) do
+            if h and h.Parent then h.FillColor = visual.espColor end
+        end
+    end)
+    makeActionRow(scroll10, "🟢 Зелёный ESP", Color3.fromRGB(60, 255, 60), function()
+        visual.espColor = Color3.fromRGB(60, 255, 60)
+        for _, h in pairs(espHighlights) do
+            if h and h.Parent then h.FillColor = visual.espColor end
+        end
+    end)
+    makeActionRow(scroll10, "🔵 Синий ESP", Color3.fromRGB(60, 120, 255), function()
+        visual.espColor = Color3.fromRGB(60, 120, 255)
+        for _, h in pairs(espHighlights) do
+            if h and h.Parent then h.FillColor = visual.espColor end
+        end
+    end)
+    makeActionRow(scroll10, "🟣 Фиолетовый ESP", Color3.fromRGB(180, 80, 255), function()
+        visual.espColor = Color3.fromRGB(180, 80, 255)
+        for _, h in pairs(espHighlights) do
+            if h and h.Parent then h.FillColor = visual.espColor end
+        end
+    end)
+    makeActionRow(scroll10, "🟡 Жёлтый ESP", Color3.fromRGB(255, 220, 60), function()
+        visual.espColor = Color3.fromRGB(255, 220, 60)
+        for _, h in pairs(espHighlights) do
+            if h and h.Parent then h.FillColor = visual.espColor end
+        end
+    end)
+
+    makeToggleRow(scroll10, "Показывать имя", true, function(on)
+        visual.espShowName = on
+        -- Пересоздаём ESP
+        if visual.espRunning then
+            clearESP()
+            for _, other in ipairs(Players:GetPlayers()) do
+                if other ~= player then createESP(other) end
+            end
+        end
+    end):Set(true)
+
+    makeToggleRow(scroll10, "Показывать дистанцию", true, function(on)
+        visual.espShowDistance = on
+    end):Set(true)
+
+    makeToggleRow(scroll10, "ESP игроков", false, function(on)
+        visual.espRunning = on
+        if on then
+            for _, other in ipairs(Players:GetPlayers()) do
+                createESP(other)
+            end
+        else
+            clearESP()
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p.Character then
+                    local head = p.Character:FindFirstChild("Head")
+                    if head then
+                        local tag = head:FindFirstChild("VoidHubNameTag")
+                        if tag then tag:Destroy() end
+                    end
+                end
+            end
+        end
+    end)
+
+    --==========================================================
+    -- СЕКЦИЯ: КРУГ ПРИ ПРЫЖКЕ
+    --==========================================================
+    makeSectionHeader(scroll10, "💫 Круг при прыжке")
+
+    -- Размер круга
+    makeInputRow(scroll10, "Размер круга", "6", function(v)
+        if v then
+            visual.jumpRingSize = math.clamp(v, 2, 30)
+        end
+    end)
+
+    -- Цвета круга
+    makeActionRow(scroll10, "🔵 Голубой круг", Color3.fromRGB(120, 180, 255), function()
+        visual.jumpRingColor = Color3.fromRGB(120, 180, 255)
+    end)
+    makeActionRow(scroll10, "🟣 Фиолетовый круг", Color3.fromRGB(180, 100, 255), function()
+        visual.jumpRingColor = Color3.fromRGB(180, 100, 255)
+    end)
+    makeActionRow(scroll10, "🔴 Красный круг", Color3.fromRGB(255, 80, 80), function()
+        visual.jumpRingColor = Color3.fromRGB(255, 80, 80)
+    end)
+    makeActionRow(scroll10, "🟢 Зелёный круг", Color3.fromRGB(80, 255, 120), function()
+        visual.jumpRingColor = Color3.fromRGB(80, 255, 120)
+    end)
+    makeActionRow(scroll10, "🟡 Золотой круг", Color3.fromRGB(255, 220, 80), function()
+        visual.jumpRingColor = Color3.fromRGB(255, 220, 80)
+    end)
+
+    -- Функция создания круга
+    local function createJumpRing(position, color, size)
+        local ring = Instance.new("Part")
+        ring.Name = "VoidHubJumpRing"
+        ring.Shape = Enum.PartType.Cylinder
+        ring.Size = Vector3.new(0.2, size, size)
+        ring.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90))
+        ring.Anchored = true
+        ring.CanCollide = false
+        ring.CanTouch = false
+        ring.CanQuery = false
+        ring.Material = Enum.Material.Neon
+        ring.Color = color
+        ring.Transparency = 0.2
+        ring.Parent = workspace
+
+        -- Анимация расширения + исчезновения
+        task.spawn(function()
+            for i = 1, 20 do
+                if not ring.Parent then break end
+                local progress = i / 20
+                ring.Size = Vector3.new(0.2, size * (1 + progress * 0.8), size * (1 + progress * 0.8))
+                ring.Transparency = 0.2 + progress * 0.8
+                task.wait(0.03)
+            end
+            if ring.Parent then ring:Destroy() end
+        end)
+    end
+
+    -- Обработчик прыжка
+    local jumpConnection = nil
+
+    local function startJumpRing()
+        local char = player.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        if jumpConnection then
+            pcall(function() jumpConnection:Disconnect() end)
+        end
+
+        jumpConnection = hum.StateChanged:Connect(function(old, new)
+            if new == Enum.HumanoidStateType.Jumping then
+                local curHRP = char:FindFirstChild("HumanoidRootPart")
+                if curHRP then
+                    createJumpRing(curHRP.Position, visual.jumpRingColor, visual.jumpRingSize)
+                end
+            end
+        end)
+    end
+
+    local function stopJumpRing()
+        if jumpConnection then
+            pcall(function() jumpConnection:Disconnect() end)
+            jumpConnection = nil
+        end
+    end
+
+    makeToggleRow(scroll10, "Круг при прыжке", false, function(on)
+        visual.jumpRingRunning = on
+        if on then
+            startJumpRing()
+        else
+            stopJumpRing()
+        end
+    end)
+
+    -- Рестарт при респавне
+    player.CharacterAdded:Connect(function()
+        task.wait(1)
+        if visual.jumpRingRunning then
+            startJumpRing()
+        end
+    end)
+
+    --==========================================================
+    -- СЕКЦИЯ: БЫСТРЫЙ СБРОС
+    --==========================================================
+    makeSectionHeader(scroll10, "🔄 Сброс")
+
+    makeActionRow(scroll10, "🧹 Сбросить всё", Color3.fromRGB(120, 50, 60), function()
+        -- Освещение
+        resetLighting()
+
+        -- Туман
+        visual.fogRunning = false
+
+        -- Частицы
+        if airParticle and airParticle.Parent then
+            airParticle:Destroy()
+            airParticle = nil
+        end
+        visual.particlesRunning = false
+
+        -- ESP
+        clearESP()
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Character then
+                local head = p.Character:FindFirstChild("Head")
+                if head then
+                    local tag = head:FindFirstChild("VoidHubNameTag")
+                    if tag then tag:Destroy() end
+                end
+            end
+        end
+        visual.espRunning = false
+
+        -- Круг
+        stopJumpRing()
+        visual.jumpRingRunning = false
+
+        print("[Visuals] Всё сброшено.")
+    end)
+
+    print("[Visuals] Вкладка загружена.")
 end)
