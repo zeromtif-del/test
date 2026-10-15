@@ -15,7 +15,50 @@ do
 _G.__VH_CONFIG_REGISTRY = {
     toggles = {},
     inputs = {},
+    custom = {},
 }
+
+--==============================================================
+--  📝 РЕГИСТРАЦИЯ КАСТОМНОГО СОСТОЯНИЯ
+--  Использование:
+--    registerCustomState("Lighting.ClockTime",
+--        function() return Lighting.ClockTime end,
+--        function(v) Lighting.ClockTime = v end)
+--==============================================================
+function _G.__VH_RegisterCustom(name, getFn, setFn)
+    table.insert(_G.__VH_CONFIG_REGISTRY.custom, {
+        name = name,
+        get = getFn,
+        set = setFn,
+    })
+end
+
+--==============================================================
+--  🔧 УСТАНОВКА INPUT ПО ИМЕНИ
+--  Пример: setInputByName("Время (0-24)", "18")
+--==============================================================
+function _G.__VH_SetInput(name, value)
+    for _, i in ipairs(_G.__VH_CONFIG_REGISTRY.inputs) do
+        if i.name == name then
+            i.set(value)
+            return true
+        end
+    end
+    return false
+end
+
+--==============================================================
+--  🔧 УСТАНОВКА TOGGLE ПО ИМЕНИ
+--==============================================================
+function _G.__VH_SetToggle(name, value)
+    for _, t in ipairs(_G.__VH_CONFIG_REGISTRY.toggles) do
+        if t.name == name then
+            t.set(value)
+            return true
+        end
+    end
+    return false
+end
 
 --==============================================================
 --  📂 ХЕЛПЕР ДЛЯ ПАПОК (nested через "/")
@@ -2172,6 +2215,19 @@ local rockData = {
 local selectedRock = nil
 local autoRockRunning = false
 
+-- Регистрируем выбранный камень как custom state
+task.defer(function()
+    task.wait(0.5)
+    _G.__VH_RegisterCustom("Auto Rock selected",
+        function() return selectedRock end,
+        function(v)
+            if type(v) == "string" and rockData[v] then
+                selectedRock = v
+            end
+        end
+    )
+end)
+
 -- 🔥 Кэш на 5 сек
 local _rockCache = { part = nil, lastScan = 0, lastRock = nil }
 
@@ -2235,6 +2291,28 @@ local machineData = {
     Squat = { selected = nil, running = false, active = nil },
     Lift = { selected = nil, running = false, active = nil },
 }
+
+-- Регистрируем выбранные тренажёры
+task.defer(function()
+    task.wait(0.6)
+    _G.__VH_RegisterCustom("Squat machine selected",
+        function() return machineData.Squat.selected and machineData.Squat.selected.Name or nil end,
+        function(v)
+            if type(v) == "string" and machinesFolder then
+                machineData.Squat.selected = machinesFolder:FindFirstChild(v)
+            end
+        end
+    )
+    _G.__VH_RegisterCustom("Lift machine selected",
+        function() return machineData.Lift.selected and machineData.Lift.selected.Name or nil end,
+        function(v)
+            if type(v) == "string" and machinesFolder then
+                machineData.Lift.selected = machinesFolder:FindFirstChild(v)
+            end
+        end
+    )
+end)
+
 _G.__VH_MACHINE_DATA = machineData
 
 local squatNames, liftNames = {}, {}
@@ -2735,6 +2813,16 @@ task.defer(function()
         selectedName = nil,
         listExpanded = false,
     }
+    -- Регистрируем выбранного босса Halloween
+    _G.__VH_RegisterCustom("Halloween target",
+        function() return halloween.selectedName end,
+        function(v)
+            if type(v) == "string" then
+                halloween.selectedName = v
+            end
+        end
+    )
+    
     _G.__VH_HALLOWEEN_STATE = halloween
 
     local function getBossPart(model)
@@ -3360,6 +3448,28 @@ end)
 task.defer(function()
     task.wait(0.5)
 
+    -- Регистрируем Lighting-настройки как custom states
+    _G.__VH_RegisterCustom("Lighting.ClockTime",
+        function() return Lighting.ClockTime end,
+        function(v) if tonumber(v) then Lighting.ClockTime = tonumber(v) end end
+    )
+    _G.__VH_RegisterCustom("Lighting.Brightness",
+        function() return Lighting.Brightness end,
+        function(v) if tonumber(v) then Lighting.Brightness = tonumber(v) end end
+    )
+    _G.__VH_RegisterCustom("Lighting.FogStart",
+        function() return Lighting.FogStart end,
+        function(v) if tonumber(v) then Lighting.FogStart = tonumber(v) end end
+    )
+    _G.__VH_RegisterCustom("Lighting.FogEnd",
+        function() return Lighting.FogEnd end,
+        function(v) if tonumber(v) then Lighting.FogEnd = tonumber(v) end end
+    )
+    _G.__VH_RegisterCustom("Lighting.FogColor",
+        function() return Lighting.FogColor end,
+        function(v) if typeof(v) == "Color3" then Lighting.FogColor = v end end
+    )
+
     local visual = {
         skyRunning = false,
         fogRunning = false,
@@ -3404,15 +3514,19 @@ task.defer(function()
 
     makeActionRow(scroll10, "🌅 Рассвет (6:00)", Color3.fromRGB(255, 160, 80), function()
         Lighting.ClockTime = 6
+        _G.__VH_SetInput("Время (0-24)", "6")
     end)
     makeActionRow(scroll10, "☀️ День (12:00)", Color3.fromRGB(255, 220, 100), function()
         Lighting.ClockTime = 12
+        _G.__VH_SetInput("Время (0-24)", "12")
     end)
     makeActionRow(scroll10, "🌇 Закат (18:00)", Color3.fromRGB(255, 120, 60), function()
         Lighting.ClockTime = 18
+        _G.__VH_SetInput("Время (0-24)", "18")
     end)
     makeActionRow(scroll10, "🌙 Ночь (0:00)", Color3.fromRGB(80, 90, 160), function()
         Lighting.ClockTime = 0
+        _G.__VH_SetInput("Время (0-24)", "0")
     end)
 
     makeActionRow(scroll10, "🔄 Сбросить освещение", Color3.fromRGB(90, 45, 55), function()
@@ -3439,35 +3553,36 @@ task.defer(function()
         end
     end)
 
+    -- Регистрируем выбор цвета тумана
+    _G.__VH_RegisterCustom("Fog preset color",
+        function() return visual.fogColor end,
+        function(v)
+            if typeof(v) == "Color3" then
+                visual.fogColor = v
+                if visual.fogRunning then Lighting.FogColor = v end
+            end
+        end
+    )
+
     makeActionRow(scroll10, "🌫️ Серый туман", Color3.fromRGB(150, 150, 160), function()
         visual.fogColor = Color3.fromRGB(180, 180, 190)
-        if visual.fogRunning then
-            Lighting.FogColor = visual.fogColor
-        end
+        if visual.fogRunning then Lighting.FogColor = visual.fogColor end
     end)
     makeActionRow(scroll10, "🌃 Ночной туман", Color3.fromRGB(30, 30, 60), function()
         visual.fogColor = Color3.fromRGB(20, 20, 50)
-        if visual.fogRunning then
-            Lighting.FogColor = visual.fogColor
-        end
+        if visual.fogRunning then Lighting.FogColor = visual.fogColor end
     end)
     makeActionRow(scroll10, "🩸 Кровавый туман", Color3.fromRGB(120, 20, 20), function()
         visual.fogColor = Color3.fromRGB(120, 20, 20)
-        if visual.fogRunning then
-            Lighting.FogColor = visual.fogColor
-        end
+        if visual.fogRunning then Lighting.FogColor = visual.fogColor end
     end)
     makeActionRow(scroll10, "🟣 Фиолетовый туман", Color3.fromRGB(100, 60, 150), function()
         visual.fogColor = Color3.fromRGB(100, 60, 150)
-        if visual.fogRunning then
-            Lighting.FogColor = visual.fogColor
-        end
+        if visual.fogRunning then Lighting.FogColor = visual.fogColor end
     end)
     makeActionRow(scroll10, "💚 Зелёный туман", Color3.fromRGB(60, 130, 60), function()
         visual.fogColor = Color3.fromRGB(60, 130, 60)
-        if visual.fogRunning then
-            Lighting.FogColor = visual.fogColor
-        end
+        if visual.fogRunning then Lighting.FogColor = visual.fogColor end
     end)
 
     makeToggleRow(scroll10, "Применить туман", false, function(on)
@@ -4153,7 +4268,8 @@ task.defer(function()
     -- Захват / применение
     -------------------------------------------------------------
     local function captureState()
-        local state = { toggles = {}, inputs = {} }
+        local state = { toggles = {}, inputs = {}, custom = {} }
+
         for _, t in ipairs(_G.__VH_CONFIG_REGISTRY.toggles) do
             local ok, val = pcall(t.get)
             if ok then state.toggles[t.name] = val end
@@ -4162,11 +4278,29 @@ task.defer(function()
             local ok, val = pcall(i.get)
             if ok then state.inputs[i.name] = val end
         end
+
+        -- 🔥 Кастомные состояния
+        for _, c in ipairs(_G.__VH_CONFIG_REGISTRY.custom) do
+            local ok, val = pcall(c.get)
+            if ok then
+                -- Color3 нельзя в JSON — конвертируем
+                if typeof(val) == "Color3" then
+                    state.custom[c.name] = {
+                        __type = "Color3",
+                        r = val.R, g = val.G, b = val.B,
+                    }
+                else
+                    state.custom[c.name] = val
+                end
+            end
+        end
+
         return state
     end
 
     local function applyState(state)
         if not state then return end
+
         if state.toggles then
             for _, t in ipairs(_G.__VH_CONFIG_REGISTRY.toggles) do
                 if state.toggles[t.name] ~= nil then
@@ -4174,10 +4308,25 @@ task.defer(function()
                 end
             end
         end
+
         if state.inputs then
             for _, i in ipairs(_G.__VH_CONFIG_REGISTRY.inputs) do
                 if state.inputs[i.name] ~= nil then
                     pcall(function() i.set(state.inputs[i.name]) end)
+                end
+            end
+        end
+
+        -- 🔥 Кастомные состояния
+        if state.custom then
+            for _, c in ipairs(_G.__VH_CONFIG_REGISTRY.custom) do
+                local val = state.custom[c.name]
+                if val ~= nil then
+                    -- Color3 разворачиваем
+                    if type(val) == "table" and val.__type == "Color3" then
+                        val = Color3.new(val.r or 0, val.g or 0, val.b or 0)
+                    end
+                    pcall(function() c.set(val) end)
                 end
             end
         end
