@@ -747,6 +747,130 @@ local function makeInputRow(parent, labelText, defaultText, callback)
 end
 
 --==============================================================
+--  🎚️ SLIDER (ползунок)
+--==============================================================
+local function makeSliderRow(parent, labelText, minVal, maxVal, defaultVal, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 56)
+    row.BackgroundColor3 = CONFIG.cardColor
+    row.BorderSizePixel = 0
+    row.Parent = parent
+    Instance.new("UICorner", row).CornerRadius = UDim.new(0, 10)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = CONFIG.accentColor
+    stroke.Thickness = 1
+    stroke.Transparency = 0.85
+    stroke.Parent = row
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, -15, 0, 20)
+    label.Position = UDim2.new(0, 14, 0, 6)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextColor3 = CONFIG.textColor
+    label.TextSize = 13
+    label.Font = Enum.Font.GothamMedium
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = row
+
+    local valLabel = Instance.new("TextLabel")
+    valLabel.Size = UDim2.new(0.3, -15, 0, 20)
+    valLabel.Position = UDim2.new(0.7, 0, 0, 6)
+    valLabel.BackgroundTransparency = 1
+    valLabel.Text = tostring(defaultVal or minVal)
+    valLabel.TextColor3 = CONFIG.accentColor2
+    valLabel.TextSize = 13
+    valLabel.Font = Enum.Font.GothamBold
+    valLabel.TextXAlignment = Enum.TextXAlignment.Right
+    valLabel.Parent = row
+
+    local track = Instance.new("Frame")
+    track.Size = UDim2.new(1, -28, 0, 8)
+    track.Position = UDim2.new(0, 14, 0, 34)
+    track.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    track.BorderSizePixel = 0
+    track.Parent = row
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(0, 0, 1, 0)
+    fill.BackgroundColor3 = CONFIG.accentColor
+    fill.BorderSizePixel = 0
+    fill.Parent = track
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.fromOffset(16, 16)
+    knob.AnchorPoint = Vector2.new(0.5, 0.5)
+    knob.Position = UDim2.new(0, 0, 0.5, 0)
+    knob.BackgroundColor3 = Color3.new(1, 1, 1)
+    knob.BorderSizePixel = 0
+    knob.ZIndex = 2
+    knob.Parent = track
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+
+    local value = defaultVal or minVal
+    local range = maxVal - minVal
+    local dragging = false
+
+    local function apply(v, fireCallback)
+        v = math.clamp(math.floor(v + 0.5), minVal, maxVal)
+        value = v
+        local r = (v - minVal) / range
+        fill.Size = UDim2.new(r, 0, 1, 0)
+        knob.Position = UDim2.new(r, 0, 0.5, 0)
+        valLabel.Text = tostring(v)
+        if fireCallback and callback then callback(v) end
+    end
+
+    local function setFromX(x)
+        local trackX = track.AbsolutePosition.X
+        local trackW = track.AbsoluteSize.X
+        if trackW <= 0 then return end
+        local ratio = math.clamp((x - trackX) / trackW, 0, 1)
+        apply(minVal + ratio * range, true)
+    end
+
+    apply(value, false)
+
+    local hit = Instance.new("TextButton")
+    hit.Size = UDim2.new(1, 0, 0, 34)
+    hit.Position = UDim2.new(0, 0, 0, 22)
+    hit.BackgroundTransparency = 1
+    hit.Text = ""
+    hit.Parent = row
+
+    hit.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            setFromX(input.Position.X)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            setFromX(input.Position.X)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    return {
+        Get = function() return value end,
+        Set = function(v) apply(v, true) end,
+    }
+end
+
+--==============================================================
 --  📁 ОБЁРТКИ ДЛЯ АВТО-РЕГИСТРАЦИИ В КОНФИГАХ
 --==============================================================
 do
@@ -1433,6 +1557,218 @@ makeToggleRow(scroll4, "Hide Pets", true, function(on)
 end)
 makeToggleRow(scroll4, "Hide Popups", true, function(on)
     if savePlayerSizeEvent then savePlayerSizeEvent:FireServer("showPopupsOption") end
+end)
+
+--==============================================================
+--  🛸 ДВИЖЕНИЕ
+--==============================================================
+makeSectionHeader(scroll4, "🛸 Движение")
+
+---------------------------------------------------------------
+-- ПОЛЁТ
+---------------------------------------------------------------
+local flightEnabled = false
+local flightSpeed = 60
+local flightBV, flightBG, flightConn = nil, nil, nil
+
+local function startFlight()
+    if flightConn then return end
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    if hrp:FindFirstChild("VHFlightBV") then hrp.VHFlightBV:Destroy() end
+    if hrp:FindFirstChild("VHFlightBG") then hrp.VHFlightBG:Destroy() end
+
+    flightBV = Instance.new("BodyVelocity")
+    flightBV.Name = "VHFlightBV"
+    flightBV.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+    flightBV.Velocity = Vector3.zero
+    flightBV.P = 1250
+    flightBV.Parent = hrp
+
+    flightBG = Instance.new("BodyGyro")
+    flightBG.Name = "VHFlightBG"
+    flightBG.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+    flightBG.P = 1000
+    flightBG.D = 100
+    flightBG.CFrame = hrp.CFrame
+    flightBG.Parent = hrp
+
+    flightConn = RunService.RenderStepped:Connect(function()
+        if not flightEnabled then return end
+        local c = player.Character
+        if not c then return end
+        local h = c:FindFirstChild("HumanoidRootPart")
+        if not h then return end
+        local cam = workspace.CurrentCamera
+        if not cam then return end
+
+        local moveDir = Vector3.zero
+        local forward = cam.CFrame.LookVector
+        local right = cam.CFrame.RightVector
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - right end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + right end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDir = moveDir + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDir = moveDir - Vector3.new(0, 1, 0)
+        end
+
+        if moveDir.Magnitude > 0 then
+            moveDir = moveDir.Unit * flightSpeed
+        end
+
+        flightBV.Velocity = moveDir
+        flightBG.CFrame = cam.CFrame
+    end)
+end
+
+local function stopFlight()
+    if flightConn then
+        flightConn:Disconnect()
+        flightConn = nil
+    end
+    if flightBV and flightBV.Parent then flightBV:Destroy() end
+    if flightBG and flightBG.Parent then flightBG:Destroy() end
+    flightBV, flightBG = nil, nil
+end
+
+makeInputRow(scroll4, "Скорость полёта", "60", function(v)
+    if v and v > 0 then
+        flightSpeed = v
+    end
+end)
+
+makeToggleRow(scroll4, "Полёт (WASD + Space/Ctrl)", false, function(on)
+    flightEnabled = on
+    if on then startFlight() else stopFlight() end
+end)
+
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if flightEnabled then startFlight() end
+end)
+
+---------------------------------------------------------------
+-- NOCLIP
+---------------------------------------------------------------
+local noclipEnabled = false
+
+makeToggleRow(scroll4, "Проход сквозь стены", false, function(on)
+    noclipEnabled = on
+end)
+
+task.spawn(function()
+    while _G.__VH_GEN == MY_GEN do
+        if noclipEnabled then
+            local char = player.Character
+            if char then
+                for _, p in ipairs(char:GetDescendants()) do
+                    if p:IsA("BasePart") and p.CanCollide then
+                        p.CanCollide = false
+                    end
+                end
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+--==============================================================
+--  🎥 КАМЕРА
+--==============================================================
+makeSectionHeader(scroll4, "🎥 Камера")
+
+---------------------------------------------------------------
+-- FREECAM
+---------------------------------------------------------------
+local freecamEnabled = false
+local freecamSpeed = 120
+local freecamConn = nil
+local freecamCF = nil
+
+local function startFreecam()
+    if freecamConn then return end
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+
+    freecamCF = cam.CFrame
+    cam.CameraType = Enum.CameraType.Scriptable
+
+    freecamConn = RunService.RenderStepped:Connect(function(dt)
+        if not freecamEnabled then return end
+        local c = workspace.CurrentCamera
+        if not c then return end
+
+        local moveDir = Vector3.zero
+        local forward = freecamCF.LookVector
+        local right = freecamCF.RightVector
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - forward end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - right end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + right end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDir = moveDir + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDir = moveDir - Vector3.new(0, 1, 0)
+        end
+
+        if moveDir.Magnitude > 0 then
+            freecamCF = freecamCF + moveDir.Unit * freecamSpeed * dt
+        end
+
+        c.CFrame = freecamCF
+    end)
+end
+
+local function stopFreecam()
+    if freecamConn then
+        freecamConn:Disconnect()
+        freecamConn = nil
+    end
+    local cam = workspace.CurrentCamera
+    if cam then
+        cam.CameraType = Enum.CameraType.Custom
+    end
+    freecamCF = nil
+end
+
+local freecamToggleRow = makeToggleRow(scroll4, "Свободная камера (C)", false, function(on)
+    freecamEnabled = on
+    if on then startFreecam() else stopFreecam() end
+end)
+
+makeSliderRow(scroll4, "Скорость камеры", 70, 250, 120, function(v)
+    freecamSpeed = v
+end)
+
+-- Клавиша C
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.C then
+        freecamEnabled = not freecamEnabled
+        if freecamEnabled then
+            startFreecam()
+        else
+            stopFreecam()
+        end
+        if freecamToggleRow then
+            freecamToggleRow:Set(freecamEnabled)
+        end
+    end
+end)
+
+player.CharacterAdded:Connect(function()
+    task.wait(1)
+    if freecamEnabled then startFreecam() end
 end)
 
 makeSectionHeader(scroll4, "⚡ Разное")
