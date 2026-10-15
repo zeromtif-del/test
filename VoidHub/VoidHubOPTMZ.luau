@@ -2368,6 +2368,27 @@ end)
 print("test")
 
 --==============================================================
+--  🔮 AUTO CRYSTAL — загрузчик из GitHub
+--==============================================================
+makeSectionHeader(scroll6, "🔮 Auto Crystal")
+
+makeActionRow(scroll6, "🚀 Загрузить Auto Crystal", Color3.fromRGB(140, 80, 255), function()
+    local url = "https://raw.githubusercontent.com/zeromtif-del/test/refs/heads/main/VoidHub/AutoCrystal.luau"
+
+    local ok, err = pcall(function()
+        loadstring(game:HttpGet(url))()
+    end)
+
+    if not ok then
+        warn("[AutoCrystal] Ошибка загрузки: " .. tostring(err))
+    else
+        print("[AutoCrystal] Загружен успешно")
+    end
+end)
+
+makeInfoLabel(scroll6, "Загрузит меню Auto Crystal с 4 режимами", CONFIG.textDim)
+
+--==============================================================
 --  📦 ВКЛАДКА 7 — ИНВЕНТАРЬ
 --==============================================================
 makeSectionHeader(scroll7, "🥤 Бустеры")
