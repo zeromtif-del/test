@@ -1907,6 +1907,26 @@ end
 
 local bossStatus = makeInfoLabel(scroll6, "Босс: —", CONFIG.textDim)
 
+-- Инициализация настроек
+bossData.hitSpeed = 30
+bossData.hitWait = 0.02
+
+makeInputRow(scroll6, "Ударов за бёрст", "30", function(v)
+    if v and v > 0 then
+        bossData.hitSpeed = math.clamp(math.floor(v), 5, 100)
+        bossStatus.Text = ("Настройка: %d ударов за бёрст"):format(bossData.hitSpeed)
+        bossStatus.TextColor3 = CONFIG.green
+    end
+end)
+
+makeInputRow(scroll6, "Пауза между ударами (мс)", "20", function(v)
+    if v and v > 0 then
+        bossData.hitWait = math.clamp(v, 10, 100) / 1000
+        bossStatus.Text = ("Настройка: пауза %d мс"):format(v)
+        bossStatus.TextColor3 = CONFIG.green
+    end
+end)
+
 makeToggleRow(scroll6, "Auto Boss", false, function(on)
     bossData.running = on
 
@@ -1930,16 +1950,23 @@ makeToggleRow(scroll6, "Auto Boss", false, function(on)
                     end
                 end
 
-                if boss and isAliveBoss(boss) then
-                    for _ = 1, 15 do
-                        if not bossData.running then break end
-                        if not isAliveBoss(boss) then break end
-                        attackBoss(boss)
-                        task.wait(0.05)
-                    end
-                else
-                    task.wait(0.5)
-                end
+if boss and isAliveBoss(boss) then
+    -- 🔥 Быстрая атака: 30 ударов с минимальной паузой
+    local hits = bossData.hitSpeed or 30
+    local waitTime = bossData.hitWait or 0.02
+
+    for _ = 1, hits do
+        if not bossData.running then break end
+        if not isAliveBoss(boss) then break end
+        attackBoss(boss)
+        task.wait(waitTime)
+    end
+
+    -- Короткая пауза, чтобы сервер не отбросил
+    task.wait(0.05)
+else
+    task.wait(0.3)
+end
 
                 if boss and not isAliveBoss(boss) then
                     local waitStart = tick()
