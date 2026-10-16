@@ -1689,6 +1689,7 @@ makeSectionHeader(scroll4, "🎥 Камера")
 --  🎥 КАМЕРА (Freecam)
 --==============================================================
 local freecamEnabled = false
+local freecamSensitivity = 0.05
 local freecamSpeed = 120
 local freecamCF = nil
 local freecamRenderConn = nil
@@ -1752,7 +1753,7 @@ local function startFreecam()
         if not freecamRmbDown then return end
         if not input.Delta then return end
 
-        local sens = 0.01
+        local sens = freecamSensitivity
         local yaw = math.rad(-input.Delta.X * sens)
         local pitch = math.rad(-input.Delta.Y * sens)
         freecamCF = freecamCF * CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
@@ -1858,6 +1859,12 @@ end)
 
 makeSliderRow(scroll4, "Скорость камеры", 70, 250, 120, function(v)
     freecamSpeed = v
+end)
+
+makeInputRow(scroll4, "Чувствительность ПКМ", "0.05", function(v)
+    if v and v > 0 then
+        freecamSensitivity = v / 100
+    end
 end)
 
 UserInputService.InputBegan:Connect(function(input, processed)
