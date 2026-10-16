@@ -1,6 +1,8 @@
 _G.__VH_GEN = (_G.__VH_GEN or 0) + 1
 local MY_GEN = _G.__VH_GEN
 
+print("[DEBUG] VoidHub стартовал, генерация", _G.__VH_GEN)
+
 do
 
 --==============================================================
@@ -4935,3 +4937,5 @@ task.defer(function()
 
     print("[Configs] Загружено. Папка: " .. CONFIGS_FOLDER)
 end)
+
+print("[DEBUG] VoidHub загрузился ДО КОНЦА")
