@@ -29,11 +29,11 @@ local SCRIPTS = {
         icon = "⚡",
         url  = "https://raw.githubusercontent.com/zeromtif-del/test/refs/heads/main/VoidHub/VoidHubOPTMZ.luau",
     },
-    {
-        name = "Скрипт 3",
-        desc = "Здесь будет описание третьего скрипта",
-        icon = "🔥",
-        url  = "https://raw.githubusercontent.com/zeromtif-del/test/refs/heads/main/VoidHub/test.lua",
+    --{
+        --name = "Скрипт 3",
+        --desc = "Здесь будет описание третьего скрипта",
+        --icon = "🔥",
+        --url  = "https://raw.githubusercontent.com/zeromtif-del/test/refs/heads/main/VoidHub/test.lua",
     },
     -- ⬆️ ДОБАВЛЯЙ СЮДА СВОИ СКРИПТЫ
     -- { name = "...", desc = "...", icon = "💫", url = "https://..." },
