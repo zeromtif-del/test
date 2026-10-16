@@ -3005,8 +3005,7 @@ task.spawn(function()
             end
         end
         task.wait(0.5)
-    end
-end) --]]
+    end ]] --
 
 --==============================================================
 --  RIGHT PANEL
