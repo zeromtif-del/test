@@ -34,7 +34,7 @@ local SCRIPTS = {
         --desc = "Здесь будет описание третьего скрипта",
         --icon = "🔥",
         --url  = "https://raw.githubusercontent.com/zeromtif-del/test/refs/heads/main/VoidHub/test.lua",
-    },
+    --},
     -- ⬆️ ДОБАВЛЯЙ СЮДА СВОИ СКРИПТЫ
     -- { name = "...", desc = "...", icon = "💫", url = "https://..." },
 }
