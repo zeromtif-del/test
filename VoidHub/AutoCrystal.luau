@@ -426,18 +426,20 @@ toggleBtn.MouseLeave:Connect(function()
 end)
 
 --==============================================================
---  ПЕРЕТАСКИВАНИЕ КНОПКИ
+--  ПЕРЕТАСКИВАНИЕ КНОПКИ (клик vs drag)
 --==============================================================
 local draggingToggle = false
-local toggleDragStart, toggleStartPos, toggleClickStart
+local toggleDragStart = nil
+local toggleStartPos = nil
+local toggleHasMoved = false
 
 toggleBtn.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
         draggingToggle = true
+        toggleHasMoved = false
         toggleDragStart = input.Position
         toggleStartPos = toggleBtn.Position
-        toggleClickStart = input.Position
     end
 end)
 
@@ -446,29 +448,33 @@ UserInputService.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement
     or input.UserInputType == Enum.UserInputType.Touch then
         local delta = input.Position - toggleDragStart
-        toggleBtn.Position = UDim2.new(
-            toggleStartPos.X.Scale, toggleStartPos.X.Offset + delta.X,
-            toggleStartPos.Y.Scale, toggleStartPos.Y.Offset + delta.Y
-        )
+        -- Двигаем только если реально сдвинули на 5+ px
+        if delta.Magnitude > 5 then
+            toggleHasMoved = true
+        end
+        if toggleHasMoved then
+            toggleBtn.Position = UDim2.new(
+                toggleStartPos.X.Scale, toggleStartPos.X.Offset + delta.X,
+                toggleStartPos.Y.Scale, toggleStartPos.Y.Offset + delta.Y
+            )
+        end
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType ~= Enum.UserInputType.MouseButton1
     and input.UserInputType ~= Enum.UserInputType.Touch then return end
-    if toggleClickStart then
-        local moved = (input.Position - toggleClickStart).Magnitude
-        if moved < 6 then
-            -- это был клик
-            if mainFrame.Visible then
-                closeMenu()
-            else
-                openMenu()
-            end
+
+    if draggingToggle and not toggleHasMoved then
+        -- Это был клик → открыть/закрыть
+        if mainFrame.Visible then
+            closeMenu()
+        else
+            openMenu()
         end
-        toggleClickStart = nil
     end
     draggingToggle = false
+    toggleHasMoved = false
 end)
 
 --==============================================================
@@ -478,11 +484,11 @@ local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.Position = UDim2.fromScale(0.5, 0.5)
-mainFrame.Size = UDim2.fromOffset(0, 0)   -- для анимации
+mainFrame.Size = UDim2.fromOffset(0, 0)
 mainFrame.BackgroundColor3 = C.bg
 mainFrame.BorderSizePixel = 0
 mainFrame.Visible = false
-mainFrame.ClipsDescendants = true
+mainFrame.ClipsDescendants = false   -- 🔥 было true — мешало скроллу
 mainFrame.Parent = gui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 16)
 
@@ -705,10 +711,15 @@ scroll.Size = UDim2.new(1, -30, 0, 200)
 scroll.Position = UDim2.new(0, 15, 0, 178)
 scroll.BackgroundColor3 = C.panel
 scroll.BorderSizePixel = 0
-scroll.ScrollBarThickness = 4
+scroll.ScrollBarThickness = 6
 scroll.ScrollBarImageColor3 = C.accent
 scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scroll.ScrollingDirection = Enum.ScrollingDirection.Y
+scroll.ScrollingEnabled = true
+scroll.Active = true
+scroll.ElasticBehavior = Enum.ElasticBehavior.WhenScrollable
+scroll.ClipsDescendants = true
 scroll.Parent = innerContainer
 Instance.new("UICorner", scroll).CornerRadius = UDim.new(0, 10)
 registerThemed(scroll, "BackgroundColor3", "panel")
@@ -722,7 +733,7 @@ local listPad = Instance.new("UIPadding")
 listPad.PaddingLeft = UDim.new(0, 6)
 listPad.PaddingRight = UDim.new(0, 6)
 listPad.PaddingTop = UDim.new(0, 6)
-listPad.PaddingBottom = UDim.new(0, 6)
+listPad.PaddingBottom = UDim.new(0, 30)
 listPad.Parent = scroll
 
 local crystalButtons = {}
@@ -1287,22 +1298,35 @@ local function openMenu()
     isAnimating = true
     mainFrame.Visible = true
 
+    -- Сразу правильный размер, анимируем только прозрачность и "поп"
+    mainFrame.Size = UDim2.fromOffset(440, 660)
+
     if state.animationsEnabled then
-        mainFrame.Size = UDim2.fromOffset(0, 0)
         mainFrame.BackgroundTransparency = 1
         mainStroke.Transparency = 1
 
-        tween(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Size = UDim2.fromOffset(440, 660),
+        -- "появление" — от маленького масштаба
+        local uiScale = mainFrame:FindFirstChildOfClass("UIScale")
+        if not uiScale then
+            uiScale = Instance.new("UIScale")
+            uiScale.Parent = mainFrame
+        end
+        uiScale.Scale = 0.85
+
+        tween(uiScale, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Scale = 1,
+        })
+        tween(mainFrame, TweenInfo.new(0.25), {
             BackgroundTransparency = state.transparency * 0.7,
         })
-        tween(mainStroke, TweenInfo.new(0.3), {
+        tween(mainStroke, TweenInfo.new(0.25), {
             Transparency = 0.4,
         })
 
         task.wait(0.3)
     else
-        mainFrame.Size = UDim2.fromOffset(440, 660)
+        mainFrame.BackgroundTransparency = state.transparency * 0.7
+        mainStroke.Transparency = 0.4
     end
     isAnimating = false
 end
@@ -1312,11 +1336,16 @@ local function closeMenu()
     isAnimating = true
 
     if state.animationsEnabled then
-        tween(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-            Size = UDim2.fromOffset(0, 0),
+        local uiScale = mainFrame:FindFirstChildOfClass("UIScale")
+        if uiScale then
+            tween(uiScale, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                Scale = 0.85,
+            })
+        end
+        tween(mainFrame, TweenInfo.new(0.18), {
             BackgroundTransparency = 1,
         })
-        tween(mainStroke, TweenInfo.new(0.2), { Transparency = 1 })
+        tween(mainStroke, TweenInfo.new(0.18), { Transparency = 1 })
         task.wait(0.2)
     end
     mainFrame.Visible = false
