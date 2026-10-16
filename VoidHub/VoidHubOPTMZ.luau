@@ -2931,9 +2931,24 @@ end)
 task.spawn(function()
     while _G.__VH_GEN == MY_GEN do
         if viewedPlayer and viewedPlayer.Parent then
+            -- 🔍 Ищет сначала в leaderstats, потом напрямую
             local function gv(n)
-                local v = viewedPlayer:FindFirstChild(n)
-                return v and (tonumber(v.Value) or 0) or 0
+                -- 1. Проверяем leaderstats
+                local ls = viewedPlayer:FindFirstChild("leaderstats")
+                if ls then
+                    local v = ls:FindFirstChild(n)
+                    if v and (v:IsA("IntValue") or v:IsA("NumberValue")) then
+                        return tonumber(v.Value) or 0
+                    end
+                end
+
+                -- 2. Прямо в player
+                local v2 = viewedPlayer:FindFirstChild(n)
+                if v2 and (v2:IsA("IntValue") or v2:IsA("NumberValue")) then
+                    return tonumber(v2.Value) or 0
+                end
+
+                return 0
             end
 
             viewedStats["💪 Strength"].Text = "💪 Strength: " .. fmtNum(gv("Strength"))
