@@ -2807,6 +2807,195 @@ task.spawn(function()
 end)
 
 --==============================================================
+--  👤 СТАТЫ ИГРОКА — выбор через разворачивающийся список
+--==============================================================
+makeSectionHeader(scroll8, "👤 Статы игрока")
+
+-- Состояние
+local viewedPlayer = nil       -- игрок, чьи статы показываем
+local playerListExpanded = false
+
+-- Метка выбранного игрока
+local selectedPlayerLabel = makeInfoLabel(scroll8, "🎯 Игрок: не выбран", CONFIG.orange)
+
+-- Кнопка разворота списка
+local playerListBtn = makeActionRow(scroll8, "📜 Показать список игроков", Color3.fromRGB(60, 90, 180), function() end)
+
+-- Контейнер списка
+local playerListFrame = Instance.new("Frame")
+playerListFrame.Size = UDim2.new(1, 0, 0, 0)
+playerListFrame.BackgroundColor3 = CONFIG.panelColor
+playerListFrame.BorderSizePixel = 0
+playerListFrame.ClipsDescendants = true
+playerListFrame.Visible = false
+playerListFrame.Parent = scroll8
+Instance.new("UICorner", playerListFrame).CornerRadius = UDim.new(0, 8)
+
+local playerListLayout = Instance.new("UIListLayout")
+playerListLayout.Padding = UDim.new(0, 4)
+playerListLayout.Parent = playerListFrame
+
+local playerListPad = Instance.new("UIPadding")
+playerListPad.PaddingLeft = UDim.new(0, 6)
+playerListPad.PaddingRight = UDim.new(0, 6)
+playerListPad.PaddingTop = UDim.new(0, 6)
+playerListPad.PaddingBottom = UDim.new(0, 6)
+playerListPad.Parent = playerListFrame
+
+-- Строки для статов игрока
+local viewedStats = {}
+viewedStats["💪 Strength"]   = makeInfoLabel(scroll8, "💪 Strength: —", CONFIG.textDim)
+viewedStats["♻️ Rebirths"]   = makeInfoLabel(scroll8, "♻️ Rebirths: —", CONFIG.textDim)
+viewedStats["🛡️ Durability"] = makeInfoLabel(scroll8, "🛡️ Durability: —", CONFIG.textDim)
+viewedStats["☠️ Kills"]      = makeInfoLabel(scroll8, "☠️ Kills: —", CONFIG.textDim)
+viewedStats["⚡ Agility"]    = makeInfoLabel(scroll8, "⚡ Agility: —", CONFIG.textDim)
+viewedStats["😈 Evil Karma"] = makeInfoLabel(scroll8, "😈 Evil Karma: —", CONFIG.textDim)
+viewedStats["😇 Good Karma"] = makeInfoLabel(scroll8, "😇 Good Karma: —", CONFIG.textDim)
+viewedStats["🥊 Brawls"]     = makeInfoLabel(scroll8, "🥊 Brawls: —", CONFIG.textDim)
+
+--==============================================================
+--  ФУНКЦИЯ: пересобрать список игроков
+--==============================================================
+local playerButtons = {}
+
+local function rebuildPlayerList()
+    for _, b in ipairs(playerButtons) do
+        if b and b.Parent then b:Destroy() end
+    end
+    playerButtons = {}
+
+    local count = 0
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player then
+            count = count + 1
+
+            local b = Instance.new("TextButton")
+            b.Size = UDim2.new(1, -8, 0, 32)
+            b.BackgroundColor3 = (viewedPlayer == other) and Color3.fromRGB(60, 40, 100) or CONFIG.cardColor
+            b.Text = ("  %s (@%s)"):format(other.DisplayName, other.Name)
+            b.TextColor3 = CONFIG.textColor
+            b.TextSize = 12
+            b.Font = Enum.Font.GothamMedium
+            b.AutoButtonColor = false
+            b.TextXAlignment = Enum.TextXAlignment.Left
+            b.LayoutOrder = count
+            b.Parent = playerListFrame
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+
+            b.MouseEnter:Connect(function()
+                if viewedPlayer ~= other then
+                    b.BackgroundColor3 = CONFIG.cardHover
+                end
+            end)
+            b.MouseLeave:Connect(function()
+                if viewedPlayer ~= other then
+                    b.BackgroundColor3 = CONFIG.cardColor
+                end
+            end)
+            b.MouseButton1Click:Connect(function()
+                viewedPlayer = other
+                selectedPlayerLabel.Text = ("🎯 Игрок: %s (@%s)"):format(other.DisplayName, other.Name)
+                selectedPlayerLabel.TextColor3 = CONFIG.green
+
+                -- Свернуть список
+                playerListExpanded = false
+                playerListFrame.Visible = false
+                playerListBtn.Text = "📜 Показать список игроков"
+            end)
+
+            table.insert(playerButtons, b)
+        end
+    end
+
+    if count == 0 then
+        local empty = Instance.new("TextLabel")
+        empty.Size = UDim2.new(1, -8, 0, 30)
+        empty.BackgroundTransparency = 1
+        empty.Text = "На сервере нет других игроков"
+        empty.TextColor3 = CONFIG.textDim
+        empty.TextSize = 12
+        empty.Font = Enum.Font.Gotham
+        empty.Parent = playerListFrame
+        table.insert(playerButtons, empty)
+    end
+end
+
+--==============================================================
+--  Кнопка разворота
+--==============================================================
+playerListBtn.MouseButton1Click:Connect(function()
+    playerListExpanded = not playerListExpanded
+    if playerListExpanded then
+        rebuildPlayerList()
+        local count = 0
+        for _, c in ipairs(playerListFrame:GetChildren()) do
+            if c:IsA("TextButton") or c:IsA("TextLabel") then
+                count = count + 1
+            end
+        end
+        playerListFrame.Size = UDim2.new(1, 0, 0, math.max(36, count * 36 + 12))
+        playerListFrame.Visible = true
+        playerListBtn.Text = "📜 Скрыть список"
+    else
+        playerListFrame.Visible = false
+        playerListBtn.Text = "📜 Показать список игроков"
+    end
+end)
+
+-- Обновление при заходе/выходе игроков
+Players.PlayerAdded:Connect(function()
+    if playerListExpanded then rebuildPlayerList() end
+end)
+Players.PlayerRemoving:Connect(function(p)
+    if viewedPlayer == p then
+        viewedPlayer = nil
+        selectedPlayerLabel.Text = "🎯 Игрок: не выбран (вышел из игры)"
+        selectedPlayerLabel.TextColor3 = CONFIG.red
+    end
+    if playerListExpanded then rebuildPlayerList() end
+end)
+
+--==============================================================
+--  Обновление статов выбранного игрока
+--  Путь: Players.<nick>.<Stat> (не leaderstats!)
+--==============================================================
+local function getStatValue(statName)
+    if not viewedPlayer or not viewedPlayer.Parent then return 0 end
+    local v = viewedPlayer:FindFirstChild(statName)
+    return v and (tonumber(v.Value) or 0) or 0
+end
+
+task.spawn(function()
+    while _G.__VH_GEN == MY_GEN do
+        if viewedPlayer and viewedPlayer.Parent then
+            local map = {
+                ["💪 Strength"]   = getStatValue("Strength"),
+                ["♻️ Rebirths"]   = getStatValue("Rebirths"),
+                ["🛡️ Durability"] = getStatValue("Durability"),
+                ["☠️ Kills"]      = getStatValue("Kills"),
+                ["⚡ Agility"]    = getStatValue("Agility"),
+                ["😈 Evil Karma"] = getStatValue("evilKarma"),
+                ["😇 Good Karma"] = getStatValue("goodKarma"),
+                ["🥊 Brawls"]     = getStatValue("Brawls"),
+            }
+
+            for name, value in pairs(map) do
+                if viewedStats[name] then
+                    viewedStats[name].Text = ("%s: %s"):format(name, fmtNum(value))
+                    viewedStats[name].TextColor3 = CONFIG.textColor
+                end
+            end
+        else
+            for name, label in pairs(viewedStats) do
+                label.Text = name .. ": —"
+                label.TextColor3 = CONFIG.textDim
+            end
+        end
+        task.wait(0.5)
+    end
+end)
+
+--==============================================================
 --  RIGHT PANEL
 --==============================================================
 local statsCard = Instance.new("Frame")
