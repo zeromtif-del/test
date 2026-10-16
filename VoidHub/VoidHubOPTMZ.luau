@@ -1752,7 +1752,7 @@ local function startFreecam()
         if not freecamRmbDown then return end
         if not input.Delta then return end
 
-        local sens = 0.05
+        local sens = 0.10
         local yaw = math.rad(-input.Delta.X * sens)
         local pitch = math.rad(-input.Delta.Y * sens)
         freecamCF = freecamCF * CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
