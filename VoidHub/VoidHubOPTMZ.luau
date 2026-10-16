@@ -2808,7 +2808,6 @@ end)
 
 --==============================================================
 --  👤 СТАТЫ ИГРОКА — выбор через разворачивающийся список
---  LayoutOrder 5000+ → всегда ниже «Твои статы»
 --==============================================================
 local ORDER_BASE = 5000
 local _ord = ORDER_BASE
@@ -2822,20 +2821,15 @@ local function applyOrder(obj)
     return obj
 end
 
--- Заголовок
 applyOrder(makeSectionHeader(scroll8, "👤 Статы игрока"))
 
--- Метка выбранного игрока
 local selectedPlayerLabel = applyOrder(makeInfoLabel(scroll8, "🎯 Игрок: не выбран", CONFIG.orange))
 
--- Кнопка разворота списка
 local playerListBtn = applyOrder(makeActionRow(scroll8, "📜 Показать список игроков", Color3.fromRGB(60, 90, 180), function() end))
 
--- Состояние
 local viewedPlayer = nil
 local playerListExpanded = false
 
--- Контейнер списка
 local playerListFrame = Instance.new("Frame")
 playerListFrame.LayoutOrder = nextOrder()
 playerListFrame.Size = UDim2.new(1, 0, 0, 0)
@@ -2857,7 +2851,6 @@ playerListPad.PaddingTop = UDim.new(0, 6)
 playerListPad.PaddingBottom = UDim.new(0, 6)
 playerListPad.Parent = playerListFrame
 
--- Строки для статов игрока
 local viewedStats = {}
 viewedStats["💪 Strength"]   = applyOrder(makeInfoLabel(scroll8, "💪 Strength: —", CONFIG.textDim))
 viewedStats["♻️ Rebirths"]   = applyOrder(makeInfoLabel(scroll8, "♻️ Rebirths: —", CONFIG.textDim))
@@ -2868,9 +2861,6 @@ viewedStats["😈 Evil Karma"] = applyOrder(makeInfoLabel(scroll8, "😈 Evil Ka
 viewedStats["😇 Good Karma"] = applyOrder(makeInfoLabel(scroll8, "😇 Good Karma: —", CONFIG.textDim))
 viewedStats["🥊 Brawls"]     = applyOrder(makeInfoLabel(scroll8, "🥊 Brawls: —", CONFIG.textDim))
 
---==============================================================
---  Список игроков
---==============================================================
 local playerButtons = {}
 
 local function rebuildPlayerList()
@@ -2934,9 +2924,6 @@ local function rebuildPlayerList()
     end
 end
 
---==============================================================
---  Кнопка разворота
---==============================================================
 playerListBtn.MouseButton1Click:Connect(function()
     playerListExpanded = not playerListExpanded
     if playerListExpanded then
@@ -2959,6 +2946,7 @@ end)
 Players.PlayerAdded:Connect(function()
     if playerListExpanded then rebuildPlayerList() end
 end)
+
 Players.PlayerRemoving:Connect(function(p)
     if viewedPlayer == p then
         viewedPlayer = nil
@@ -2968,10 +2956,6 @@ Players.PlayerRemoving:Connect(function(p)
     if playerListExpanded then rebuildPlayerList() end
 end)
 
---==============================================================
---  Обновление статов выбранного игрока
---  Путь: Players.<nick>.<Stat>
---==============================================================
 local function getStatValue(statName)
     if not viewedPlayer or not viewedPlayer.Parent then return 0 end
     local v = viewedPlayer:FindFirstChild(statName)
