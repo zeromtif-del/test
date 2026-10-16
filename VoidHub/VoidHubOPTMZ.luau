@@ -2808,21 +2808,36 @@ end)
 
 --==============================================================
 --  👤 СТАТЫ ИГРОКА — выбор через разворачивающийся список
+--  LayoutOrder 5000+ → всегда ниже «Твои статы»
 --==============================================================
-makeSectionHeader(scroll8, "👤 Статы игрока")
+local ORDER_BASE = 5000
+local _ord = ORDER_BASE
+local function nextOrder()
+    _ord = _ord + 1
+    return _ord
+end
 
--- Состояние
-local viewedPlayer = nil       -- игрок, чьи статы показываем
-local playerListExpanded = false
+local function applyOrder(obj)
+    obj.LayoutOrder = nextOrder()
+    return obj
+end
+
+-- Заголовок
+applyOrder(makeSectionHeader(scroll8, "👤 Статы игрока"))
 
 -- Метка выбранного игрока
-local selectedPlayerLabel = makeInfoLabel(scroll8, "🎯 Игрок: не выбран", CONFIG.orange)
+local selectedPlayerLabel = applyOrder(makeInfoLabel(scroll8, "🎯 Игрок: не выбран", CONFIG.orange))
 
 -- Кнопка разворота списка
-local playerListBtn = makeActionRow(scroll8, "📜 Показать список игроков", Color3.fromRGB(60, 90, 180), function() end)
+local playerListBtn = applyOrder(makeActionRow(scroll8, "📜 Показать список игроков", Color3.fromRGB(60, 90, 180), function() end))
+
+-- Состояние
+local viewedPlayer = nil
+local playerListExpanded = false
 
 -- Контейнер списка
 local playerListFrame = Instance.new("Frame")
+playerListFrame.LayoutOrder = nextOrder()
 playerListFrame.Size = UDim2.new(1, 0, 0, 0)
 playerListFrame.BackgroundColor3 = CONFIG.panelColor
 playerListFrame.BorderSizePixel = 0
@@ -2844,17 +2859,17 @@ playerListPad.Parent = playerListFrame
 
 -- Строки для статов игрока
 local viewedStats = {}
-viewedStats["💪 Strength"]   = makeInfoLabel(scroll8, "💪 Strength: —", CONFIG.textDim)
-viewedStats["♻️ Rebirths"]   = makeInfoLabel(scroll8, "♻️ Rebirths: —", CONFIG.textDim)
-viewedStats["🛡️ Durability"] = makeInfoLabel(scroll8, "🛡️ Durability: —", CONFIG.textDim)
-viewedStats["☠️ Kills"]      = makeInfoLabel(scroll8, "☠️ Kills: —", CONFIG.textDim)
-viewedStats["⚡ Agility"]    = makeInfoLabel(scroll8, "⚡ Agility: —", CONFIG.textDim)
-viewedStats["😈 Evil Karma"] = makeInfoLabel(scroll8, "😈 Evil Karma: —", CONFIG.textDim)
-viewedStats["😇 Good Karma"] = makeInfoLabel(scroll8, "😇 Good Karma: —", CONFIG.textDim)
-viewedStats["🥊 Brawls"]     = makeInfoLabel(scroll8, "🥊 Brawls: —", CONFIG.textDim)
+viewedStats["💪 Strength"]   = applyOrder(makeInfoLabel(scroll8, "💪 Strength: —", CONFIG.textDim))
+viewedStats["♻️ Rebirths"]   = applyOrder(makeInfoLabel(scroll8, "♻️ Rebirths: —", CONFIG.textDim))
+viewedStats["🛡️ Durability"] = applyOrder(makeInfoLabel(scroll8, "🛡️ Durability: —", CONFIG.textDim))
+viewedStats["☠️ Kills"]      = applyOrder(makeInfoLabel(scroll8, "☠️ Kills: —", CONFIG.textDim))
+viewedStats["⚡ Agility"]    = applyOrder(makeInfoLabel(scroll8, "⚡ Agility: —", CONFIG.textDim))
+viewedStats["😈 Evil Karma"] = applyOrder(makeInfoLabel(scroll8, "😈 Evil Karma: —", CONFIG.textDim))
+viewedStats["😇 Good Karma"] = applyOrder(makeInfoLabel(scroll8, "😇 Good Karma: —", CONFIG.textDim))
+viewedStats["🥊 Brawls"]     = applyOrder(makeInfoLabel(scroll8, "🥊 Brawls: —", CONFIG.textDim))
 
 --==============================================================
---  ФУНКЦИЯ: пересобрать список игроков
+--  Список игроков
 --==============================================================
 local playerButtons = {}
 
@@ -2897,7 +2912,6 @@ local function rebuildPlayerList()
                 selectedPlayerLabel.Text = ("🎯 Игрок: %s (@%s)"):format(other.DisplayName, other.Name)
                 selectedPlayerLabel.TextColor3 = CONFIG.green
 
-                -- Свернуть список
                 playerListExpanded = false
                 playerListFrame.Visible = false
                 playerListBtn.Text = "📜 Показать список игроков"
@@ -2942,14 +2956,13 @@ playerListBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Обновление при заходе/выходе игроков
 Players.PlayerAdded:Connect(function()
     if playerListExpanded then rebuildPlayerList() end
 end)
 Players.PlayerRemoving:Connect(function(p)
     if viewedPlayer == p then
         viewedPlayer = nil
-        selectedPlayerLabel.Text = "🎯 Игрок: не выбран (вышел из игры)"
+        selectedPlayerLabel.Text = "🎯 Игрок: не выбран (вышел)"
         selectedPlayerLabel.TextColor3 = CONFIG.red
     end
     if playerListExpanded then rebuildPlayerList() end
@@ -2957,7 +2970,7 @@ end)
 
 --==============================================================
 --  Обновление статов выбранного игрока
---  Путь: Players.<nick>.<Stat> (не leaderstats!)
+--  Путь: Players.<nick>.<Stat>
 --==============================================================
 local function getStatValue(statName)
     if not viewedPlayer or not viewedPlayer.Parent then return 0 end
