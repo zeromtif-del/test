@@ -1685,31 +1685,30 @@ end)
 --==============================================================
 makeSectionHeader(scroll4, "🎥 Камера")
 
----------------------------------------------------------------
--- FREECAM (вращение ПКМ + якорение + возврат камеры)
----------------------------------------------------------------
+--==============================================================
+--  🎥 КАМЕРА (Freecam)
+--==============================================================
 local freecamEnabled = false
 local freecamSpeed = 120
-local freecamConn = nil
 local freecamCF = nil
+local freecamRenderConn = nil
+local freecamInputBegConn = nil
+local freecamInputEndConn = nil
+local freecamInputChangeConn = nil
 local freecamAnchoredParts = nil
-local freecamOldMouseBehavior = nil
-local freecamRotateConn = nil
-local freecamRmbConn = nil
-local freecamRmbEndConn = nil
+local freecamRmbDown = false
+local freecamToggleRow = nil
 
 local function startFreecam()
-    if freecamConn then return end
+    if freecamRenderConn then return end
+
     local cam = workspace.CurrentCamera
     if not cam then return end
 
-    -- Стартовая позиция камеры
     freecamCF = cam.CFrame
+    freecamRmbDown = false
 
-    -- Запоминаем режим мыши
-    freecamOldMouseBehavior = UserInputService.MouseBehavior
-
-    -- Якорим все части персонажа, чтобы он не двигался
+    -- Якорим части персонажа
     freecamAnchoredParts = {}
     local char = player.Character
     if char then
@@ -1721,61 +1720,66 @@ local function startFreecam()
         end
     end
 
-    -- Отключаем встроенный контроллер камеры
     cam.CameraType = Enum.CameraType.Scriptable
 
-    -------------------------------------------------------------
-    -- 🔥 ПКМ down/up → lock/unlock курсора
-    -------------------------------------------------------------
-    local rmbConn = UserInputService.InputBegan:Connect(function(input, processed)
+    -- ПКМ зажат → блокируем курсор
+    freecamInputBegConn = UserInputService.InputBegan:Connect(function(input)
         if not freecamEnabled then return end
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+            freecamRmbDown = true
+            pcall(function()
+                UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+            end)
         end
     end)
 
-    local rmbEndConn = UserInputService.InputEnded:Connect(function(input)
-        if not freecamEnabled then return end
+    -- ПКМ отпущен → возвращаем курсор
+    freecamInputEndConn = UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+            freecamRmbDown = false
+            if freecamEnabled then
+                pcall(function()
+                    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+                end)
+            end
         end
     end)
 
-    -------------------------------------------------------------
-    -- 🔥 Вращение через InputChanged + input.Delta
-    -------------------------------------------------------------
-    local rotateConn = UserInputService.InputChanged:Connect(function(input)
+    -- Вращение мышью
+    freecamInputChangeConn = UserInputService.InputChanged:Connect(function(input)
         if not freecamEnabled then return end
         if input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
-        if not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
+        if not freecamRmbDown then return end
+        if not input.Delta then return end
 
-        local sens = 0.003
-        local yaw = math.rad(-input.Delta.X * sens * 3)
-        local pitch = math.rad(-input.Delta.Y * sens * 3)
+        local sens = 0.01
+        local yaw = math.rad(-input.Delta.X * sens)
+        local pitch = math.rad(-input.Delta.Y * sens)
         freecamCF = freecamCF * CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, 0)
     end)
 
-    -- Сохраняем оба коннекта чтобы отключить при stopFreecam
-    freecamRotateConn = rotateConn
-    freecamRmbConn = rmbConn
-    freecamRmbEndConn = rmbEndConn
-
-    -------------------------------------------------------------
-    -- Основной цикл движения WASD
-    -------------------------------------------------------------
-    freecamConn = RunService.RenderStepped:Connect(function(dt)
+    -- WASD движение
+    freecamRenderConn = RunService.RenderStepped:Connect(function(dt)
         if not freecamEnabled then return end
         local c = workspace.CurrentCamera
         if not c then return end
 
-        local moveDir = Vector3.zero
+        local moveDir = Vector3.new(0, 0, 0)
         local forward = freecamCF.LookVector
         local right = freecamCF.RightVector
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + forward end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - forward end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - right end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + right end
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDir = moveDir + forward
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDir = moveDir - forward
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDir = moveDir - right
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDir = moveDir + right
+        end
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
             moveDir = moveDir + Vector3.new(0, 1, 0)
         end
@@ -1791,30 +1795,26 @@ local function startFreecam()
     end)
 end
 
-        c.CFrame = freecamCF
-    end)
-end
-
 local function stopFreecam()
-    -- Отключаем все коннекты freecam
-    if freecamConn then
-        freecamConn:Disconnect()
-        freecamConn = nil
+    if freecamRenderConn then
+        freecamRenderConn:Disconnect()
+        freecamRenderConn = nil
     end
-    if freecamRotateConn then
-        freecamRotateConn:Disconnect()
-        freecamRotateConn = nil
+    if freecamInputBegConn then
+        freecamInputBegConn:Disconnect()
+        freecamInputBegConn = nil
     end
-    if freecamRmbConn then
-        freecamRmbConn:Disconnect()
-        freecamRmbConn = nil
+    if freecamInputEndConn then
+        freecamInputEndConn:Disconnect()
+        freecamInputEndConn = nil
     end
-    if freecamRmbEndConn then
-        freecamRmbEndConn:Disconnect()
-        freecamRmbEndConn = nil
+    if freecamInputChangeConn then
+        freecamInputChangeConn:Disconnect()
+        freecamInputChangeConn = nil
     end
 
-    -- Возвращаем якоря
+    freecamRmbDown = false
+
     if freecamAnchoredParts then
         for part, wasAnchored in pairs(freecamAnchoredParts) do
             if part and part.Parent then
@@ -1824,16 +1824,12 @@ local function stopFreecam()
         freecamAnchoredParts = nil
     end
 
-    -- Возвращаем режим мыши
-    if freecamOldMouseBehavior then
-        UserInputService.MouseBehavior = freecamOldMouseBehavior
-        freecamOldMouseBehavior = nil
-    else
+    pcall(function()
         UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-    end
+    end)
 
-    -- Возвращаем камеру к персонажу
-    task.defer(function()
+    task.spawn(function()
+        wait()
         local cam = workspace.CurrentCamera
         if not cam then return end
 
@@ -1845,18 +1841,17 @@ local function stopFreecam()
         end
         cam.CameraType = Enum.CameraType.Custom
 
-        task.defer(function()
-            if hum and cam.CameraSubject ~= hum then
-                cam.CameraSubject = hum
-                cam.CameraType = Enum.CameraType.Custom
-            end
-        end)
+        wait()
+        if hum and cam.CameraSubject ~= hum then
+            cam.CameraSubject = hum
+            cam.CameraType = Enum.CameraType.Custom
+        end
     end)
 
     freecamCF = nil
 end
 
-local freecamToggleRow = makeToggleRow(scroll4, "Свободная камера (C)", false, function(on)
+freecamToggleRow = makeToggleRow(scroll4, "Свободная камера (C)", false, function(on)
     freecamEnabled = on
     if on then startFreecam() else stopFreecam() end
 end)
@@ -1865,7 +1860,6 @@ makeSliderRow(scroll4, "Скорость камеры", 70, 250, 120, function(v
     freecamSpeed = v
 end)
 
--- Клавиша C — вкл/выкл
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     if input.KeyCode == Enum.KeyCode.C then
@@ -1876,23 +1870,27 @@ UserInputService.InputBegan:Connect(function(input, processed)
             stopFreecam()
         end
         if freecamToggleRow then
-            freecamToggleRow:Set(freecamEnabled)
+            pcall(function() freecamToggleRow:Set(freecamEnabled) end)
         end
     end
 end)
 
--- При респавне — если freecam включён, перезапускаем корректно
 player.CharacterAdded:Connect(function()
-    task.wait(1.5)
-    if freecamEnabled then
-        -- Сначала выключаем, потом включаем заново чтобы перепривязать части
-        freecamEnabled = false
-        if freecamToggleRow then freecamToggleRow:Set(false) end
-        task.wait(0.1)
-        freecamEnabled = true
-        if freecamToggleRow then freecamToggleRow:Set(true) end
-        startFreecam()
-    end
+    task.spawn(function()
+        wait(1.5)
+        if freecamEnabled then
+            freecamEnabled = false
+            if freecamToggleRow then
+                pcall(function() freecamToggleRow:Set(false) end)
+            end
+            wait(0.1)
+            freecamEnabled = true
+            if freecamToggleRow then
+                pcall(function() freecamToggleRow:Set(true) end)
+            end
+            startFreecam()
+        end
+    end)
 end)
 
 makeSectionHeader(scroll4, "⚡ Разное")
