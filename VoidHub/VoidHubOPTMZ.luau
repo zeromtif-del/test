@@ -2807,31 +2807,21 @@ task.spawn(function()
 end)
 
 --==============================================================
---  👤 СТАТЫ ИГРОКА — выбор через разворачивающийся список
+--  👤 СТАТЫ ИГРОКА
 --==============================================================
-local ORDER_BASE = 5000
-local _ord = ORDER_BASE
-local function nextOrder()
-    _ord = _ord + 1
-    return _ord
-end
+print("[DEBUG 1] Статы игрока начали загрузку")
+local selectedPlayerLabel = makeInfoLabel(scroll8, "🎯 Игрок: не выбран", CONFIG.orange)
+print("[DEBUG 2] makeInfoLabel ок")
+selectedPlayerLabel.LayoutOrder = 5001
 
-local function applyOrder(obj)
-    obj.LayoutOrder = nextOrder()
-    return obj
-end
-
-applyOrder(makeSectionHeader(scroll8, "👤 Статы игрока"))
-
-local selectedPlayerLabel = applyOrder(makeInfoLabel(scroll8, "🎯 Игрок: не выбран", CONFIG.orange))
-
-local playerListBtn = applyOrder(makeActionRow(scroll8, "📜 Показать список игроков", Color3.fromRGB(60, 90, 180), function() end))
+local playerListBtn = makeActionRow(scroll8, "📜 Показать список игроков", Color3.fromRGB(60, 90, 180), function() end)
+playerListBtn.LayoutOrder = 5002
 
 local viewedPlayer = nil
 local playerListExpanded = false
 
 local playerListFrame = Instance.new("Frame")
-playerListFrame.LayoutOrder = nextOrder()
+playerListFrame.LayoutOrder = 5003
 playerListFrame.Size = UDim2.new(1, 0, 0, 0)
 playerListFrame.BackgroundColor3 = CONFIG.panelColor
 playerListFrame.BorderSizePixel = 0
@@ -2852,14 +2842,22 @@ playerListPad.PaddingBottom = UDim.new(0, 6)
 playerListPad.Parent = playerListFrame
 
 local viewedStats = {}
-viewedStats["💪 Strength"]   = applyOrder(makeInfoLabel(scroll8, "💪 Strength: —", CONFIG.textDim))
-viewedStats["♻️ Rebirths"]   = applyOrder(makeInfoLabel(scroll8, "♻️ Rebirths: —", CONFIG.textDim))
-viewedStats["🛡️ Durability"] = applyOrder(makeInfoLabel(scroll8, "🛡️ Durability: —", CONFIG.textDim))
-viewedStats["☠️ Kills"]      = applyOrder(makeInfoLabel(scroll8, "☠️ Kills: —", CONFIG.textDim))
-viewedStats["⚡ Agility"]    = applyOrder(makeInfoLabel(scroll8, "⚡ Agility: —", CONFIG.textDim))
-viewedStats["😈 Evil Karma"] = applyOrder(makeInfoLabel(scroll8, "😈 Evil Karma: —", CONFIG.textDim))
-viewedStats["😇 Good Karma"] = applyOrder(makeInfoLabel(scroll8, "😇 Good Karma: —", CONFIG.textDim))
-viewedStats["🥊 Brawls"]     = applyOrder(makeInfoLabel(scroll8, "🥊 Brawls: —", CONFIG.textDim))
+viewedStats["💪 Strength"]   = makeInfoLabel(scroll8, "💪 Strength: —", CONFIG.textDim)
+viewedStats["♻️ Rebirths"]   = makeInfoLabel(scroll8, "♻️ Rebirths: —", CONFIG.textDim)
+viewedStats["🛡️ Durability"] = makeInfoLabel(scroll8, "🛡️ Durability: —", CONFIG.textDim)
+viewedStats["☠️ Kills"]      = makeInfoLabel(scroll8, "☠️ Kills: —", CONFIG.textDim)
+viewedStats["⚡ Agility"]    = makeInfoLabel(scroll8, "⚡ Agility: —", CONFIG.textDim)
+viewedStats["😈 Evil Karma"] = makeInfoLabel(scroll8, "😈 Evil Karma: —", CONFIG.textDim)
+viewedStats["😇 Good Karma"] = makeInfoLabel(scroll8, "😇 Good Karma: —", CONFIG.textDim)
+viewedStats["🥊 Brawls"]     = makeInfoLabel(scroll8, "🥊 Brawls: —", CONFIG.textDim)
+viewedStats["💪 Strength"].LayoutOrder   = 5010
+viewedStats["♻️ Rebirths"].LayoutOrder   = 5011
+viewedStats["🛡️ Durability"].LayoutOrder = 5012
+viewedStats["☠️ Kills"].LayoutOrder      = 5013
+viewedStats["⚡ Agility"].LayoutOrder    = 5014
+viewedStats["😈 Evil Karma"].LayoutOrder = 5015
+viewedStats["😇 Good Karma"].LayoutOrder = 5016
+viewedStats["🥊 Brawls"].LayoutOrder     = 5017
 
 local playerButtons = {}
 
@@ -2873,10 +2871,9 @@ local function rebuildPlayerList()
     for _, other in ipairs(Players:GetPlayers()) do
         if other ~= player then
             count = count + 1
-
             local b = Instance.new("TextButton")
             b.Size = UDim2.new(1, -8, 0, 32)
-            b.BackgroundColor3 = (viewedPlayer == other) and Color3.fromRGB(60, 40, 100) or CONFIG.cardColor
+            b.BackgroundColor3 = CONFIG.cardColor
             b.Text = ("  %s (@%s)"):format(other.DisplayName, other.Name)
             b.TextColor3 = CONFIG.textColor
             b.TextSize = 12
@@ -2887,21 +2884,10 @@ local function rebuildPlayerList()
             b.Parent = playerListFrame
             Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
 
-            b.MouseEnter:Connect(function()
-                if viewedPlayer ~= other then
-                    b.BackgroundColor3 = CONFIG.cardHover
-                end
-            end)
-            b.MouseLeave:Connect(function()
-                if viewedPlayer ~= other then
-                    b.BackgroundColor3 = CONFIG.cardColor
-                end
-            end)
             b.MouseButton1Click:Connect(function()
                 viewedPlayer = other
                 selectedPlayerLabel.Text = ("🎯 Игрок: %s (@%s)"):format(other.DisplayName, other.Name)
                 selectedPlayerLabel.TextColor3 = CONFIG.green
-
                 playerListExpanded = false
                 playerListFrame.Visible = false
                 playerListBtn.Text = "📜 Показать список игроков"
@@ -2909,18 +2895,6 @@ local function rebuildPlayerList()
 
             table.insert(playerButtons, b)
         end
-    end
-
-    if count == 0 then
-        local empty = Instance.new("TextLabel")
-        empty.Size = UDim2.new(1, -8, 0, 30)
-        empty.BackgroundTransparency = 1
-        empty.Text = "На сервере нет других игроков"
-        empty.TextColor3 = CONFIG.textDim
-        empty.TextSize = 12
-        empty.Font = Enum.Font.Gotham
-        empty.Parent = playerListFrame
-        table.insert(playerButtons, empty)
     end
 end
 
@@ -2930,9 +2904,7 @@ playerListBtn.MouseButton1Click:Connect(function()
         rebuildPlayerList()
         local count = 0
         for _, c in ipairs(playerListFrame:GetChildren()) do
-            if c:IsA("TextButton") or c:IsA("TextLabel") then
-                count = count + 1
-            end
+            if c:IsA("TextButton") then count = count + 1 end
         end
         playerListFrame.Size = UDim2.new(1, 0, 0, math.max(36, count * 36 + 12))
         playerListFrame.Visible = true
@@ -2950,47 +2922,38 @@ end)
 Players.PlayerRemoving:Connect(function(p)
     if viewedPlayer == p then
         viewedPlayer = nil
-        selectedPlayerLabel.Text = "🎯 Игрок: не выбран (вышел)"
+        selectedPlayerLabel.Text = "🎯 Игрок: не выбран"
         selectedPlayerLabel.TextColor3 = CONFIG.red
     end
     if playerListExpanded then rebuildPlayerList() end
 end)
 
-local function getStatValue(statName)
-    if not viewedPlayer or not viewedPlayer.Parent then return 0 end
-    local v = viewedPlayer:FindFirstChild(statName)
-    return v and (tonumber(v.Value) or 0) or 0
-end
-
 task.spawn(function()
     while _G.__VH_GEN == MY_GEN do
         if viewedPlayer and viewedPlayer.Parent then
-            local map = {
-                ["💪 Strength"]   = getStatValue("Strength"),
-                ["♻️ Rebirths"]   = getStatValue("Rebirths"),
-                ["🛡️ Durability"] = getStatValue("Durability"),
-                ["☠️ Kills"]      = getStatValue("Kills"),
-                ["⚡ Agility"]    = getStatValue("Agility"),
-                ["😈 Evil Karma"] = getStatValue("evilKarma"),
-                ["😇 Good Karma"] = getStatValue("goodKarma"),
-                ["🥊 Brawls"]     = getStatValue("Brawls"),
-            }
-
-            for name, value in pairs(map) do
-                if viewedStats[name] then
-                    viewedStats[name].Text = ("%s: %s"):format(name, fmtNum(value))
-                    viewedStats[name].TextColor3 = CONFIG.textColor
-                end
+            local function gv(n)
+                local v = viewedPlayer:FindFirstChild(n)
+                return v and (tonumber(v.Value) or 0) or 0
             end
-        else
-            for name, label in pairs(viewedStats) do
-                label.Text = name .. ": —"
-                label.TextColor3 = CONFIG.textDim
+
+            viewedStats["💪 Strength"].Text = "💪 Strength: " .. fmtNum(gv("Strength"))
+            viewedStats["♻️ Rebirths"].Text = "♻️ Rebirths: " .. fmtNum(gv("Rebirths"))
+            viewedStats["🛡️ Durability"].Text = "🛡️ Durability: " .. fmtNum(gv("Durability"))
+            viewedStats["☠️ Kills"].Text = "☠️ Kills: " .. fmtNum(gv("Kills"))
+            viewedStats["⚡ Agility"].Text = "⚡ Agility: " .. fmtNum(gv("Agility"))
+            viewedStats["😈 Evil Karma"].Text = "😈 Evil Karma: " .. fmtNum(gv("evilKarma"))
+            viewedStats["😇 Good Karma"].Text = "😇 Good Karma: " .. fmtNum(gv("goodKarma"))
+            viewedStats["🥊 Brawls"].Text = "🥊 Brawls: " .. fmtNum(gv("Brawls"))
+
+            for _, label in pairs(viewedStats) do
+                label.TextColor3 = CONFIG.textColor
             end
         end
         task.wait(0.5)
     end
 end)
+
+print("[DEBUG FINAL] Блок Статы игрока загружен полностью")
 
 --==============================================================
 --  RIGHT PANEL
