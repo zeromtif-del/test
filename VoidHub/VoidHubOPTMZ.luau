@@ -2810,7 +2810,7 @@ end)
 --  👤 СТАТЫ ИГРОКА — выбор через разворачивающийся список
 --  LayoutOrder 5000+ → всегда ниже «Твои статы»
 --==============================================================
-local ORDER_BASE = 5000
+-- [[ local ORDER_BASE = 5000
 local _ord = ORDER_BASE
 local function nextOrder()
     _ord = _ord + 1
@@ -3006,7 +3006,7 @@ task.spawn(function()
         end
         task.wait(0.5)
     end
-end)
+end) --]]
 
 --==============================================================
 --  RIGHT PANEL
