@@ -25,7 +25,7 @@ local SCRIPTS = {
     },
     {
         name = "Void Hub OPTMZ",
-        desc = "Здесь будет описание второго скрипта",
+        desc = "Оптимизированная версия Void Hub",
         icon = "⚡",
         url  = "https://raw.githubusercontent.com/zeromtif-del/test/refs/heads/main/VoidHub/VoidHubOPTMZ.lua",
     },
