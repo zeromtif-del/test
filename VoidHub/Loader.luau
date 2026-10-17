@@ -27,7 +27,7 @@ local SCRIPTS = {
         name = "Void Hub OPTMZ",
         desc = "Здесь будет описание второго скрипта",
         icon = "⚡",
-        url  = "https://raw.githubusercontent.com/zeromtif-del/test/refs/heads/main/VoidHub/VoidHubOPTMZ.lu",
+        url  = "https://raw.githubusercontent.com/zeromtif-del/test/refs/heads/main/VoidHub/VoidHubOPTMZ.lua",
     },
     --{
         --name = "Скрипт 3",
