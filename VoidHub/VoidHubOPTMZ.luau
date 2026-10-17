@@ -1925,7 +1925,7 @@ end)
 --==============================================================
 --  🎵 CUSTOM MUSIC PLAYER (из папки VoidHub/Audios)
 --==============================================================
-makeSectionHeader(scroll4, "🎵 Музыка")
+--[[ makeSectionHeader(scroll4, "🎵 Музыка")
 
 local AUDIO_FOLDER = "VoidHub/Audios"
 
@@ -2203,7 +2203,7 @@ task.spawn(function()
             refreshTrackList()
         end
     end
-end)
+end) --]]
 
 makeToggleRow(scroll4, "Spin Fortune Wheel", false, function(on) fortuneWheelRunning = on end)
 
